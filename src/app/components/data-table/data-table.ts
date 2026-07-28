@@ -2,69 +2,145 @@ import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   TemplateRef,
   computed,
   contentChildren,
+  inject,
   input,
-  signal,
+  model,
 } from '@angular/core';
 import { CellTemplate } from './cell-template';
+import { Paginator } from './paginator';
+import {
+  Column,
+  DEFAULT_PAGE_SIZE,
+  TableMode,
+  TableQuery,
+  applyQuery,
+  cellText,
+  clampPageIndex,
+  emptyQuery,
+  filterOptionsFor,
+} from './table-query';
 
-export type SortDirection = 'asc' | 'desc';
+export type { Column, SortDirection, TableMode, TableQuery, TablePage } from './table-query';
+export { DEFAULT_PAGE_SIZE, emptyQuery } from './table-query';
 
-export interface Column<T> {
-  /** Property read for sorting, and for the default cell text. */
-  readonly key: keyof T & string;
-  readonly header: string;
-  readonly align?: 'start' | 'end';
-  /** Sortable unless explicitly disabled. */
-  readonly sortable?: boolean;
-  /** Overrides the displayed text. The raw value is still used for sorting. */
-  readonly format?: (row: T) => string;
-}
+let nextId = 0;
 
 /**
- * Sortable table over a list of rows and a column config.
+ * Sortable, filterable, paged table over a list of rows and a column config.
  *
- * Filtering deliberately lives with the caller: this component owns presentation
- * and sort order only, so the same table can back a search box, a date range, or
- * nothing at all.
+ * The same component drives both modes. Client-side (the default) it takes every
+ * row and applies `query` itself; server-side it takes one page plus `total` and
+ * treats `query` purely as an output, leaving the fetch to the caller. Because
+ * both paths run the same filter/sort/page order, switching modes does not
+ * change what page 2 contains.
+ *
+ * ```html
+ * <!-- client -->
+ * <app-data-table [rows]="all()" [columns]="columns" caption="…" />
+ *
+ * <!-- server -->
+ * <app-data-table
+ *   mode="server"
+ *   [rows]="page().rows"
+ *   [total]="page().total"
+ *   [loading]="resource.isLoading()"
+ *   [(query)]="query"
+ *   [columns]="columns"
+ *   caption="…"
+ * />
+ * ```
  */
 @Component({
   selector: 'app-data-table',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet],
+  imports: [NgTemplateOutlet, Paginator],
   templateUrl: './data-table.html',
 })
 export class DataTable<T extends { id: string }> {
+  /** Every row in `client` mode; the current page in `server` mode. */
   readonly rows = input.required<readonly T[]>();
   readonly columns = input.required<readonly Column<T>[]>();
   /** Screen-reader description of the table. */
   readonly caption = input.required<string>();
   readonly emptyMessage = input('No rows match the current filters.');
 
+  readonly mode = input<TableMode>('client');
+  /** Rows matching the query across every page. Server mode only; derived otherwise. */
+  readonly total = input<number | null>(null);
+  /** Server mode only: dims the body and blocks paging while a fetch is in flight. */
+  readonly loading = input(false);
+
+  readonly searchable = input(true);
+  readonly searchLabel = input('Search table');
+  readonly searchPlaceholder = input('Search…');
+  readonly pageSizeOptions = input<readonly number[]>([10, 25, 50]);
+  /**
+   * Delay before a keystroke reaches `query`. Only applied in server mode, where
+   * every change costs a request; client-side filtering stays instant.
+   */
+  readonly searchDebounceMs = input(250);
+
+  /** The table drives this; bind it two-way to fetch pages yourself. */
+  readonly query = model<TableQuery>(emptyQuery(DEFAULT_PAGE_SIZE));
+
   private readonly cellTemplates = contentChildren<CellTemplate<T>>(CellTemplate);
 
-  private readonly sortKey = signal<string | null>(null);
-  private readonly sortDirection = signal<SortDirection>('asc');
+  private searchTimer: ReturnType<typeof setTimeout> | undefined;
 
-  protected readonly sortedRows = computed(() => {
-    const rows = this.rows();
-    const key = this.sortKey();
-    if (!key) return rows;
+  constructor() {
+    inject(DestroyRef).onDestroy(() => clearTimeout(this.searchTimer));
+  }
 
-    const factor = this.sortDirection() === 'asc' ? 1 : -1;
-    return [...rows].sort((a, b) => factor * compare(a[key as keyof T], b[key as keyof T]));
-  });
+  protected readonly searchId = `table-search-${nextId++}`;
+
+  private readonly clientPage = computed(() =>
+    applyQuery(this.rows(), this.query(), this.columns()),
+  );
+
+  protected readonly isServer = computed(() => this.mode() === 'server');
+
+  protected readonly visibleRows = computed(() =>
+    this.isServer() ? this.rows() : this.clientPage().rows,
+  );
+
+  protected readonly totalRows = computed(() =>
+    this.isServer() ? (this.total() ?? this.rows().length) : this.clientPage().total,
+  );
+
+  protected readonly pageIndex = computed(() =>
+    clampPageIndex(this.query().pageIndex, this.totalRows(), this.query().pageSize),
+  );
+
+  protected readonly hasColumnFilters = computed(() =>
+    this.columns().some((column) => column.filter),
+  );
+
+  protected readonly paged = computed(() => this.query().pageSize > 0);
+
+  protected optionsFor(column: Column<T>): readonly string[] {
+    return filterOptionsFor(this.rows(), column);
+  }
+
+  protected filterValue(column: Column<T>): string {
+    return this.query().columnFilters[column.key] ?? '';
+  }
+
+  protected filterLabel(column: Column<T>): string {
+    return `Filter by ${column.header}`;
+  }
 
   protected ariaSort(column: Column<T>): 'ascending' | 'descending' | 'none' {
-    if (this.sortKey() !== column.key) return 'none';
-    return this.sortDirection() === 'asc' ? 'ascending' : 'descending';
+    if (this.query().sortKey !== column.key) return 'none';
+    return this.query().sortDirection === 'asc' ? 'ascending' : 'descending';
   }
 
   protected sortIndicator(column: Column<T>): string {
-    if (this.sortKey() !== column.key) return '↕';
-    return this.sortDirection() === 'asc' ? '▲' : '▼';
+    if (this.query().sortKey !== column.key) return '↕';
+    return this.query().sortDirection === 'asc' ? '▲' : '▼';
   }
 
   protected templateFor(column: Column<T>): TemplateRef<{ $implicit: T }> | null {
@@ -72,7 +148,7 @@ export class DataTable<T extends { id: string }> {
   }
 
   protected cell(row: T, column: Column<T>): string {
-    return column.format ? column.format(row) : String(row[column.key as keyof T] ?? '');
+    return cellText(row, column);
   }
 
   protected isSortable(column: Column<T>): boolean {
@@ -82,16 +158,47 @@ export class DataTable<T extends { id: string }> {
   protected toggleSort(column: Column<T>): void {
     if (!this.isSortable(column)) return;
 
-    if (this.sortKey() === column.key) {
-      this.sortDirection.update((d) => (d === 'asc' ? 'desc' : 'asc'));
+    this.query.update((q) => {
+      const repeat = q.sortKey === column.key;
+      return {
+        ...q,
+        sortKey: column.key,
+        sortDirection: repeat && q.sortDirection === 'asc' ? 'desc' : 'asc',
+        pageIndex: 0,
+      };
+    });
+  }
+
+  protected onSearch(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    clearTimeout(this.searchTimer);
+
+    const delay = this.isServer() ? this.searchDebounceMs() : 0;
+    if (delay <= 0) {
+      this.setSearch(value);
       return;
     }
-    this.sortKey.set(column.key);
-    this.sortDirection.set('asc');
+    this.searchTimer = setTimeout(() => this.setSearch(value), delay);
   }
-}
 
-function compare(a: unknown, b: unknown): number {
-  if (typeof a === 'number' && typeof b === 'number') return a - b;
-  return String(a).localeCompare(String(b));
+  protected onColumnFilter(column: Column<T>, event: Event): void {
+    const value = (event.target as HTMLInputElement | HTMLSelectElement).value;
+    this.query.update((q) => ({
+      ...q,
+      columnFilters: { ...q.columnFilters, [column.key]: value },
+      pageIndex: 0,
+    }));
+  }
+
+  protected setPageIndex(pageIndex: number): void {
+    this.query.update((q) => ({ ...q, pageIndex }));
+  }
+
+  protected setPageSize(pageSize: number): void {
+    this.query.update((q) => ({ ...q, pageSize, pageIndex: 0 }));
+  }
+
+  private setSearch(search: string): void {
+    this.query.update((q) => ({ ...q, search, pageIndex: 0 }));
+  }
 }

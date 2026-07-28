@@ -1,7 +1,8 @@
 import { Injectable, computed, signal } from '@angular/core';
 import { ServiceMetric, Stat } from '../models/service-metric.model';
 
-const SAMPLE: readonly ServiceMetric[] = [
+/** Hand-written services, used on their own by the tiles and card demos. */
+export const CURATED_SERVICES: readonly ServiceMetric[] = [
   {
     id: 'edge-router',
     name: 'Edge Router',
@@ -83,7 +84,7 @@ const SAMPLE: readonly ServiceMetric[] = [
  */
 @Injectable({ providedIn: 'root' })
 export class Metrics {
-  private readonly all = signal<readonly ServiceMetric[]>(SAMPLE);
+  private readonly all = signal<readonly ServiceMetric[]>(CURATED_SERVICES);
 
   readonly services = this.all.asReadonly();
 

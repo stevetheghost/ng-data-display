@@ -1,69 +1,139 @@
-<div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-xs">
-  <table class="w-full border-collapse text-sm">
-    <caption class="sr-only">{{ caption() }}</caption>
+<div
+  class="rounded-xl border border-slate-200 bg-white shadow-xs"
+  [attr.aria-busy]="loading() ? 'true' : null"
+>
+  @if (searchable()) {
+    <div class="flex flex-wrap items-center gap-3 border-b border-slate-200 px-4 py-3">
+      <label [attr.for]="searchId" class="text-sm font-medium text-slate-700">
+        {{ searchLabel() }}
+      </label>
+      <input
+        [attr.id]="searchId"
+        type="search"
+        [value]="query().search"
+        [placeholder]="searchPlaceholder()"
+        (input)="onSearch($event)"
+        class="w-64 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-700"
+      />
 
-    <thead>
-      <tr class="border-b border-slate-200 bg-slate-50">
-        @for (column of columns(); track column.key) {
-          <th
-            scope="col"
-            class="p-0 font-semibold text-slate-700"
-            [class]="column.align === 'end' ? 'text-right' : 'text-left'"
-            [attr.aria-sort]="isSortable(column) ? ariaSort(column) : null"
-          >
-            @if (isSortable(column)) {
-              <button
-                type="button"
-                class="flex w-full items-center gap-1.5 px-4 py-3 hover:bg-slate-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sky-700"
-                [class]="column.align === 'end' ? 'justify-end' : 'justify-start'"
-                (click)="toggleSort(column)"
-              >
-                {{ column.header }}
-                <span class="text-xs text-slate-500" aria-hidden="true">
-                  {{ sortIndicator(column) }}
-                </span>
-              </button>
-            } @else {
-              <span class="block px-4 py-3">{{ column.header }}</span>
-            }
-          </th>
-        }
-      </tr>
-    </thead>
+      @if (loading()) {
+        <span class="text-sm text-slate-500">Loading…</span>
+      }
+    </div>
+  }
 
-    <tbody>
-      @for (row of sortedRows(); track row.id) {
-        <tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+  <div class="overflow-x-auto">
+    <table class="w-full border-collapse text-sm" [class]="loading() ? 'opacity-60' : ''">
+      <caption class="sr-only">{{ caption() }}</caption>
+
+      <thead>
+        <tr class="border-b border-slate-200 bg-slate-50">
           @for (column of columns(); track column.key) {
-            @if ($first) {
-              <th scope="row" class="px-4 py-3 text-left font-medium text-slate-900">
-                <ng-container
-                  [ngTemplateOutlet]="templateFor(column) ?? defaultCell"
-                  [ngTemplateOutletContext]="{ $implicit: row, column: column }"
-                />
-              </th>
-            } @else {
-              <td
-                class="px-4 py-3 text-slate-700"
-                [class]="column.align === 'end' ? 'text-right tabular-nums' : 'text-left'"
-              >
-                <ng-container
-                  [ngTemplateOutlet]="templateFor(column) ?? defaultCell"
-                  [ngTemplateOutletContext]="{ $implicit: row, column: column }"
-                />
-              </td>
-            }
+            <th
+              scope="col"
+              class="p-0 font-semibold text-slate-700"
+              [class]="column.align === 'end' ? 'text-right' : 'text-left'"
+              [attr.aria-sort]="isSortable(column) ? ariaSort(column) : null"
+            >
+              @if (isSortable(column)) {
+                <button
+                  type="button"
+                  class="flex w-full items-center gap-1.5 px-4 py-3 hover:bg-slate-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sky-700"
+                  [class]="column.align === 'end' ? 'justify-end' : 'justify-start'"
+                  (click)="toggleSort(column)"
+                >
+                  {{ column.header }}
+                  <span class="text-xs text-slate-500" aria-hidden="true">
+                    {{ sortIndicator(column) }}
+                  </span>
+                </button>
+              } @else {
+                <span class="block px-4 py-3">{{ column.header }}</span>
+              }
+            </th>
           }
         </tr>
-      } @empty {
-        <tr>
-          <td [attr.colspan]="columns().length" class="px-4 py-10 text-center text-slate-500">
-            {{ emptyMessage() }}
-          </td>
-        </tr>
-      }
-    </tbody>
-  </table>
+
+        @if (hasColumnFilters()) {
+          <tr class="border-b border-slate-200 bg-slate-50">
+            @for (column of columns(); track column.key) {
+              <td class="px-4 pb-3">
+                @switch (column.filter) {
+                  @case ('select') {
+                    <select
+                      [attr.aria-label]="filterLabel(column)"
+                      [value]="filterValue(column)"
+                      (change)="onColumnFilter(column, $event)"
+                      class="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm font-normal text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-700"
+                    >
+                      <option value="">All</option>
+                      @for (option of optionsFor(column); track option) {
+                        <option [value]="option">{{ option }}</option>
+                      }
+                    </select>
+                  }
+                  @case ('text') {
+                    <input
+                      type="search"
+                      [attr.aria-label]="filterLabel(column)"
+                      [value]="filterValue(column)"
+                      (input)="onColumnFilter(column, $event)"
+                      class="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm font-normal text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-700"
+                    />
+                  }
+                }
+              </td>
+            }
+          </tr>
+        }
+      </thead>
+
+      <tbody>
+        @for (row of visibleRows(); track row.id) {
+          <tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+            @for (column of columns(); track column.key) {
+              @if ($first) {
+                <th scope="row" class="px-4 py-3 text-left font-medium text-slate-900">
+                  <ng-container
+                    [ngTemplateOutlet]="templateFor(column) ?? defaultCell"
+                    [ngTemplateOutletContext]="{ $implicit: row, column: column }"
+                  />
+                </th>
+              } @else {
+                <td
+                  class="px-4 py-3 text-slate-700"
+                  [class]="column.align === 'end' ? 'text-right tabular-nums' : 'text-left'"
+                >
+                  <ng-container
+                    [ngTemplateOutlet]="templateFor(column) ?? defaultCell"
+                    [ngTemplateOutletContext]="{ $implicit: row, column: column }"
+                  />
+                </td>
+              }
+            }
+          </tr>
+        } @empty {
+          <tr>
+            <td [attr.colspan]="columns().length" class="px-4 py-10 text-center text-slate-500">
+              {{ loading() ? 'Loading…' : emptyMessage() }}
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (paged()) {
+    <app-paginator
+      [pageIndex]="pageIndex()"
+      [pageSize]="query().pageSize"
+      [total]="totalRows()"
+      [pageSizeOptions]="pageSizeOptions()"
+      [disabled]="loading()"
+      (pageIndexChange)="setPageIndex($event)"
+      (pageSizeChange)="setPageSize($event)"
+    />
+  }
 </div>
 
 <ng-template #defaultCell let-row let-column="column">{{ cell(row, column) }}</ng-template>
