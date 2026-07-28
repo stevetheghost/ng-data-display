@@ -45,7 +45,7 @@ import {
             >
               <input
                 type="checkbox"
-                class="checkbox checkbox-sm"
+                class="checkbox checkbox-xs"
                 [checked]="isSelected(option)"
                 (change)="toggle(option)"
               />
