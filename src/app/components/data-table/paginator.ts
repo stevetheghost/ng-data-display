@@ -3,8 +3,7 @@ import { clampPageIndex, pageCount } from './table-query';
 
 let nextId = 0;
 
-const BUTTON =
-  'inline-flex size-8 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400';
+const BUTTON = 'join-item btn btn-sm btn-square';
 
 /**
  * Page controls for `DataTable`. Stateless: it renders the position it is given
@@ -16,13 +15,13 @@ const BUTTON =
   template: `
     <nav
       aria-label="Pagination"
-      class="flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 px-4 py-3"
+      class="flex flex-wrap items-center justify-between gap-4 border-t border-base-300 px-4 py-3"
     >
       <div class="flex items-center gap-2">
-        <label [attr.for]="selectId" class="text-sm text-slate-600">Rows per page</label>
+        <label [attr.for]="selectId" class="text-sm">Rows per page</label>
         <select
           [attr.id]="selectId"
-          class="rounded-lg border border-slate-300 bg-white py-1.5 pr-8 pl-2 text-sm text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-700"
+          class="select select-sm w-20"
           [value]="pageSize()"
           (change)="onPageSize($event)"
         >
@@ -32,50 +31,49 @@ const BUTTON =
         </select>
       </div>
 
-      <p aria-live="polite" class="text-sm text-slate-600">{{ summary() }}</p>
+      <p aria-live="polite" class="text-sm text-base-content/70">{{ summary() }}</p>
 
-      <div class="flex items-center gap-1.5">
-        <button
-          type="button"
-          [class]="button"
-          [disabled]="disabled() || onFirstPage()"
-          (click)="go(0)"
-        >
-          <span aria-hidden="true">«</span>
-          <span class="sr-only">First page</span>
-        </button>
-        <button
-          type="button"
-          [class]="button"
-          [disabled]="disabled() || onFirstPage()"
-          (click)="go(index() - 1)"
-        >
-          <span aria-hidden="true">‹</span>
-          <span class="sr-only">Previous page</span>
-        </button>
+      <div class="flex items-center gap-3">
+        <span class="text-sm text-base-content/70">Page {{ index() + 1 }} of {{ pages() }}</span>
 
-        <span class="px-2 text-sm text-slate-600">
-          Page {{ index() + 1 }} of {{ pages() }}
-        </span>
-
-        <button
-          type="button"
-          [class]="button"
-          [disabled]="disabled() || onLastPage()"
-          (click)="go(index() + 1)"
-        >
-          <span aria-hidden="true">›</span>
-          <span class="sr-only">Next page</span>
-        </button>
-        <button
-          type="button"
-          [class]="button"
-          [disabled]="disabled() || onLastPage()"
-          (click)="go(pages() - 1)"
-        >
-          <span aria-hidden="true">»</span>
-          <span class="sr-only">Last page</span>
-        </button>
+        <div class="join">
+          <button
+            type="button"
+            [class]="button"
+            [disabled]="disabled() || onFirstPage()"
+            (click)="go(0)"
+          >
+            <span aria-hidden="true">«</span>
+            <span class="sr-only">First page</span>
+          </button>
+          <button
+            type="button"
+            [class]="button"
+            [disabled]="disabled() || onFirstPage()"
+            (click)="go(index() - 1)"
+          >
+            <span aria-hidden="true">‹</span>
+            <span class="sr-only">Previous page</span>
+          </button>
+          <button
+            type="button"
+            [class]="button"
+            [disabled]="disabled() || onLastPage()"
+            (click)="go(index() + 1)"
+          >
+            <span aria-hidden="true">›</span>
+            <span class="sr-only">Next page</span>
+          </button>
+          <button
+            type="button"
+            [class]="button"
+            [disabled]="disabled() || onLastPage()"
+            (click)="go(pages() - 1)"
+          >
+            <span aria-hidden="true">»</span>
+            <span class="sr-only">Last page</span>
+          </button>
+        </div>
       </div>
     </nav>
   `,

@@ -1,3 +1,9 @@
 /* You can add global styles to this file, and also import other style files */
 
 @import "tailwindcss";
+
+/* Light only for now: the shell and the tile/card demos still use fixed slate
+   colours, so enabling a dark theme would flip the table and leave them behind. */
+@plugin "daisyui" {
+  themes: light --default;
+}

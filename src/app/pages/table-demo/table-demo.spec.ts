@@ -129,6 +129,26 @@ describe('TableDemo', () => {
     expect(bodyRows().length).toBe(10);
   });
 
+  it('keeps the previous page on screen while the next one loads', async () => {
+    await click('Server-side');
+    const before = serviceNames();
+
+    TestBed.inject(FleetApi).latencyMs.set(80);
+    buttonFor('Next page').click();
+    // Not whenStable(): the resource holds a pending task, so awaiting it would
+    // wait out the very fetch this test needs to observe mid-flight.
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    // Dimmed and busy, but still showing rows rather than blanking.
+    expect(el.querySelector('[aria-busy="true"]')).toBeTruthy();
+    expect(serviceNames()).toEqual(before);
+    expect(el.textContent).not.toContain('No rows');
+
+    await settle();
+    expect(serviceNames()).not.toEqual(before);
+  });
+
   it('agrees on page two across both modes', async () => {
     await click('Next page');
     const clientPage = serviceNames();

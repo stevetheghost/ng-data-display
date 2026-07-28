@@ -3,6 +3,7 @@ import {
   Component,
   computed,
   inject,
+  linkedSignal,
   resource,
   signal,
 } from '@angular/core';
@@ -11,6 +12,7 @@ import {
   Column,
   DataTable,
   TableMode,
+  TablePage,
   TableQuery,
   emptyQuery,
 } from '../../components/data-table/data-table';
@@ -18,6 +20,8 @@ import { StatusBadge } from '../../components/status-badge/status-badge';
 import { Fleet } from '../../data/fleet';
 import { FleetApi, toFleetRequest } from '../../data/fleet-api';
 import { ServiceMetric } from '../../models/service-metric.model';
+
+const EMPTY_PAGE: TablePage<ServiceMetric> = { rows: [], total: 0 };
 
 const MODES: readonly { value: TableMode; label: string; hint: string }[] = [
   {
@@ -80,16 +84,27 @@ export class TableDemo {
     loader: ({ params, abortSignal }) => this.api.page(params, abortSignal),
   });
 
+  /**
+   * The last page the server returned. `resource.value()` is undefined while a
+   * load is in flight, so reading it directly would empty the table on every
+   * keystroke; holding the previous page lets it sit dimmed until the next lands.
+   */
+  private readonly loaded = linkedSignal<
+    TablePage<ServiceMetric> | undefined,
+    TablePage<ServiceMetric>
+  >({
+    source: () => this.page.value(),
+    computation: (next, previous) => next ?? previous?.value ?? EMPTY_PAGE,
+  });
+
   protected readonly isServer = computed(() => this.mode() === 'server');
 
   protected readonly rows = computed(() =>
-    this.isServer() ? (this.page.value()?.rows ?? []) : this.fleet.services(),
+    this.isServer() ? this.loaded().rows : this.fleet.services(),
   );
 
   /** Null client-side, where the table counts its own matches. */
-  protected readonly total = computed(() =>
-    this.isServer() ? (this.page.value()?.total ?? 0) : null,
-  );
+  protected readonly total = computed(() => (this.isServer() ? this.loaded().total : null));
 
   protected readonly loading = computed(() => this.isServer() && this.page.isLoading());
 

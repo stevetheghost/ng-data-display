@@ -1,22 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { ServiceStatus } from '../../models/service-metric.model';
 
-const STYLES: Record<ServiceStatus, { label: string; classes: string; dot: string }> = {
-  healthy: {
-    label: 'Healthy',
-    classes: 'bg-emerald-50 text-emerald-900 ring-emerald-600/30',
-    dot: 'bg-emerald-600',
-  },
-  degraded: {
-    label: 'Degraded',
-    classes: 'bg-amber-50 text-amber-900 ring-amber-600/30',
-    dot: 'bg-amber-600',
-  },
-  offline: {
-    label: 'Offline',
-    classes: 'bg-rose-50 text-rose-900 ring-rose-600/30',
-    dot: 'bg-rose-700',
-  },
+const STYLES: Record<ServiceStatus, { label: string; badge: string }> = {
+  healthy: { label: 'Healthy', badge: 'badge-success' },
+  degraded: { label: 'Degraded', badge: 'badge-warning' },
+  offline: { label: 'Offline', badge: 'badge-error' },
 };
 
 /**
@@ -27,11 +15,10 @@ const STYLES: Record<ServiceStatus, { label: string; classes: string; dot: strin
   selector: 'app-status-badge',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <span
-      class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset"
-      [class]="style().classes"
-    >
-      <span class="size-1.5 rounded-full" [class]="style().dot" aria-hidden="true"></span>
+    <span class="badge badge-sm gap-1.5 font-medium" [class]="style().badge">
+      <!-- bg-current tracks the badge's own *-content colour, so the dot stays
+           visible on every theme without a second colour to keep in sync. -->
+      <span class="size-1.5 rounded-full bg-current opacity-80" aria-hidden="true"></span>
       {{ style().label }}
     </span>
   `,

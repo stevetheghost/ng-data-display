@@ -1,49 +1,48 @@
 <div
-  class="rounded-xl border border-slate-200 bg-white shadow-xs"
+  class="rounded-box border border-base-300 bg-base-100"
   [attr.aria-busy]="loading() ? 'true' : null"
 >
   @if (searchable()) {
-    <div class="flex flex-wrap items-center gap-3 border-b border-slate-200 px-4 py-3">
-      <label [attr.for]="searchId" class="text-sm font-medium text-slate-700">
-        {{ searchLabel() }}
-      </label>
+    <div class="flex flex-wrap items-center gap-3 border-b border-base-300 px-4 py-3">
+      <label [attr.for]="searchId" class="text-sm font-medium">{{ searchLabel() }}</label>
       <input
         [attr.id]="searchId"
         type="search"
+        class="input input-sm w-64"
         [value]="query().search"
         [placeholder]="searchPlaceholder()"
         (input)="onSearch($event)"
-        class="w-64 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-700"
       />
 
       @if (loading()) {
-        <span class="text-sm text-slate-500">Loading…</span>
+        <span class="loading loading-spinner loading-sm" aria-hidden="true"></span>
+        <span class="text-sm text-base-content/60">Loading…</span>
       }
     </div>
   }
 
   <div class="overflow-x-auto">
-    <table class="w-full border-collapse text-sm" [class]="loading() ? 'opacity-60' : ''">
+    <table class="table table-zebra" [class]="loading() ? 'opacity-60' : ''">
       <caption class="sr-only">{{ caption() }}</caption>
 
       <thead>
-        <tr class="border-b border-slate-200 bg-slate-50">
+        <tr>
           @for (column of columns(); track column.key) {
             <th
               scope="col"
-              class="p-0 font-semibold text-slate-700"
+              class="p-0"
               [class]="column.align === 'end' ? 'text-right' : 'text-left'"
               [attr.aria-sort]="isSortable(column) ? ariaSort(column) : null"
             >
               @if (isSortable(column)) {
                 <button
                   type="button"
-                  class="flex w-full items-center gap-1.5 px-4 py-3 hover:bg-slate-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sky-700"
+                  class="btn btn-ghost btn-sm w-full gap-1.5 rounded-none text-xs font-semibold tracking-wider uppercase"
                   [class]="column.align === 'end' ? 'justify-end' : 'justify-start'"
                   (click)="toggleSort(column)"
                 >
                   {{ column.header }}
-                  <span class="text-xs text-slate-500" aria-hidden="true">
+                  <span class="text-base-content/50" aria-hidden="true">
                     {{ sortIndicator(column) }}
                   </span>
                 </button>
@@ -55,16 +54,16 @@
         </tr>
 
         @if (hasColumnFilters()) {
-          <tr class="border-b border-slate-200 bg-slate-50">
+          <tr>
             @for (column of columns(); track column.key) {
-              <td class="px-4 pb-3">
+              <td class="px-4 pt-2 pb-3">
                 @switch (column.filter) {
                   @case ('select') {
                     <select
+                      class="select select-sm w-full font-normal normal-case"
                       [attr.aria-label]="filterLabel(column)"
                       [value]="filterValue(column)"
                       (change)="onColumnFilter(column, $event)"
-                      class="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm font-normal text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-700"
                     >
                       <option value="">All</option>
                       @for (option of optionsFor(column); track option) {
@@ -75,10 +74,10 @@
                   @case ('text') {
                     <input
                       type="search"
+                      class="input input-sm w-full font-normal normal-case"
                       [attr.aria-label]="filterLabel(column)"
                       [value]="filterValue(column)"
                       (input)="onColumnFilter(column, $event)"
-                      class="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm font-normal text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-700"
                     />
                   }
                 }
@@ -90,20 +89,17 @@
 
       <tbody>
         @for (row of visibleRows(); track row.id) {
-          <tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+          <tr class="hover:bg-base-200">
             @for (column of columns(); track column.key) {
               @if ($first) {
-                <th scope="row" class="px-4 py-3 text-left font-medium text-slate-900">
+                <th scope="row" class="font-medium">
                   <ng-container
                     [ngTemplateOutlet]="templateFor(column) ?? defaultCell"
                     [ngTemplateOutletContext]="{ $implicit: row, column: column }"
                   />
                 </th>
               } @else {
-                <td
-                  class="px-4 py-3 text-slate-700"
-                  [class]="column.align === 'end' ? 'text-right tabular-nums' : 'text-left'"
-                >
+                <td [class]="column.align === 'end' ? 'text-right tabular-nums' : 'text-left'">
                   <ng-container
                     [ngTemplateOutlet]="templateFor(column) ?? defaultCell"
                     [ngTemplateOutletContext]="{ $implicit: row, column: column }"
@@ -114,7 +110,10 @@
           </tr>
         } @empty {
           <tr>
-            <td [attr.colspan]="columns().length" class="px-4 py-10 text-center text-slate-500">
+            <td
+              [attr.colspan]="columns().length"
+              class="py-10 text-center text-base-content/60"
+            >
               {{ loading() ? 'Loading…' : emptyMessage() }}
             </td>
           </tr>
