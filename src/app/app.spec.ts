@@ -21,9 +21,10 @@ describe('App', () => {
     const el = await render();
     const links = el.querySelectorAll('nav a');
 
-    expect(links.length).toBe(3);
+    expect(links.length).toBe(4);
     expect(el.textContent).toContain('Stat tiles');
     expect(el.textContent).toContain('Data table');
+    expect(el.textContent).toContain('Data list');
     expect(el.textContent).toContain('Card grid');
   });
 

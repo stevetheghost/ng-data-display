@@ -1,0 +1,56 @@
+<header>
+  <h1 class="text-2xl font-semibold tracking-tight">Data list</h1>
+  <p class="mt-2 max-w-2xl text-base-content/70">
+    <code class="rounded bg-base-200 px-1.5 py-0.5 text-sm">&lt;app-data-list&gt;</code> shows the
+    same rows as the data table, one per line instead of one per grid row. It shares the table's
+    <code class="rounded bg-base-200 px-1.5 py-0.5 text-sm">query</code> object and query engine, so
+    filtering, sorting and paging behave identically in both — only the chrome differs: with no
+    column headers to click, sorting moves into the toolbar.
+  </p>
+</header>
+
+<div role="group" aria-label="Where filtering, sorting and paging run" class="join mt-8">
+  @for (option of modes; track option.value) {
+    <button
+      type="button"
+      class="join-item btn btn-sm"
+      [class]="mode() === option.value ? 'btn-active' : ''"
+      [attr.aria-pressed]="mode() === option.value"
+      (click)="setMode(option.value)"
+    >
+      {{ option.label }}
+    </button>
+  }
+</div>
+
+<p aria-live="polite" class="mt-3 text-sm text-base-content/70">
+  @for (option of modes; track option.value) {
+    @if (mode() === option.value) {
+      {{ option.hint }}
+    }
+  }
+</p>
+
+@if (error(); as failure) {
+  <div role="alert" class="alert alert-error alert-soft mt-4">
+    <span>Could not load services: {{ failure }}</span>
+  </div>
+}
+
+<div class="mt-6">
+  <app-data-list
+    [rows]="rows()"
+    [fields]="fields()"
+    [mode]="mode()"
+    [total]="total()"
+    [loading]="loading()"
+    [(query)]="query"
+    searchLabel="Search services"
+    searchPlaceholder="e.g. gateway"
+    label="Service health, last hour"
+  >
+    <ng-template appCellTemplate="status" let-row>
+      <app-status-badge [status]="row.status" />
+    </ng-template>
+  </app-data-list>
+</div>
