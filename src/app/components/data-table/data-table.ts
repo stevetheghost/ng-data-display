@@ -9,8 +9,10 @@ import {
   inject,
   input,
   model,
+  signal,
 } from '@angular/core';
 import { CellTemplate } from './cell-template';
+import { MultiSelectFilter } from './multi-select-filter';
 import { Paginator } from './paginator';
 import {
   Column,
@@ -28,6 +30,9 @@ export type { Column, SortDirection, TableMode, TableQuery, TablePage } from './
 export { DEFAULT_PAGE_SIZE, emptyQuery } from './table-query';
 
 let nextId = 0;
+
+/** Shared empty list, so an unfiltered column returns a stable reference. */
+const EMPTY: readonly string[] = [];
 
 /**
  * Sortable, filterable, paged table over a list of rows and a column config.
@@ -57,7 +62,7 @@ let nextId = 0;
 @Component({
   selector: 'app-data-table',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, Paginator],
+  imports: [NgTemplateOutlet, MultiSelectFilter, Paginator],
   templateUrl: './data-table.html',
 })
 export class DataTable<T extends { id: string }> {
@@ -119,14 +124,37 @@ export class DataTable<T extends { id: string }> {
     this.columns().some((column) => column.filter),
   );
 
+  private readonly openFilters = signal<ReadonlySet<string>>(new Set());
+
+  /**
+   * The body scrolls horizontally, which also clips anything overflowing it — so
+   * an open filter list would be cut off. Dropping the clip while one is open is
+   * enough, since the list closes before the user can scroll again.
+   */
+  protected readonly anyFilterOpen = computed(() => this.openFilters().size > 0);
+
+  protected onFilterOpen(column: Column<T>, open: boolean): void {
+    this.openFilters.update((keys) => {
+      const next = new Set(keys);
+      if (open) next.add(column.key);
+      else next.delete(column.key);
+      return next;
+    });
+  }
+
   protected readonly paged = computed(() => this.query().pageSize > 0);
 
   protected optionsFor(column: Column<T>): readonly string[] {
     return filterOptionsFor(this.rows(), column);
   }
 
+  /** Single-value view of a filter, for the `text` and `select` controls. */
   protected filterValue(column: Column<T>): string {
-    return this.query().columnFilters[column.key] ?? '';
+    return this.filterValues(column)[0] ?? '';
+  }
+
+  protected filterValues(column: Column<T>): readonly string[] {
+    return this.query().columnFilters[column.key] ?? EMPTY;
   }
 
   protected filterLabel(column: Column<T>): string {
@@ -183,9 +211,13 @@ export class DataTable<T extends { id: string }> {
 
   protected onColumnFilter(column: Column<T>, event: Event): void {
     const value = (event.target as HTMLInputElement | HTMLSelectElement).value;
+    this.setColumnFilter(column, value ? [value] : []);
+  }
+
+  protected setColumnFilter(column: Column<T>, values: readonly string[]): void {
     this.query.update((q) => ({
       ...q,
-      columnFilters: { ...q.columnFilters, [column.key]: value },
+      columnFilters: { ...q.columnFilters, [column.key]: values },
       pageIndex: 0,
     }));
   }

@@ -15,6 +15,7 @@ interface Row {
   id: string;
   name: string;
   region: string;
+  tier: string;
   score: number;
 }
 
@@ -24,11 +25,16 @@ const COLUMNS: readonly Column<Row>[] = [
   { key: 'score', header: 'Score', searchable: false, format: (row) => `${row.score} pts` },
 ];
 
+const MULTI_COLUMNS: readonly Column<Row>[] = [
+  { key: 'tier', header: 'Tier', filter: 'multiselect' },
+  { key: 'region', header: 'Region', filter: 'select' },
+];
+
 const ROWS: readonly Row[] = [
-  { id: 'a', name: 'Alpha', region: 'eu-west-1', score: 30 },
-  { id: 'b', name: 'Beta', region: 'us-east-1', score: 20 },
-  { id: 'c', name: 'Gamma', region: 'eu-west-1', score: 100 },
-  { id: 'd', name: 'Delta', region: 'us-east-1', score: 9 },
+  { id: 'a', name: 'Alpha', region: 'eu-west-1', tier: 'gold', score: 30 },
+  { id: 'b', name: 'Beta', region: 'us-east-1', tier: 'bronze', score: 20 },
+  { id: 'c', name: 'Gamma', region: 'eu-west-1', tier: 'silver', score: 100 },
+  { id: 'd', name: 'Delta', region: 'us-east-1', tier: 'gold', score: 9 },
 ];
 
 const query = (overrides: Partial<TableQuery> = {}): TableQuery => ({
@@ -59,31 +65,55 @@ describe('filterRows', () => {
   });
 
   it('matches a text column filter on substrings', () => {
-    expect(names(filterRows(ROWS, query({ columnFilters: { name: 'a' } }), COLUMNS))).toEqual([
+    expect(names(filterRows(ROWS, query({ columnFilters: { name: ['a'] } }), COLUMNS))).toEqual([
       'Alpha',
       'Beta',
       'Gamma',
       'Delta',
     ]);
-    expect(names(filterRows(ROWS, query({ columnFilters: { name: 'lt' } }), COLUMNS))).toEqual([
+    expect(names(filterRows(ROWS, query({ columnFilters: { name: ['lt'] } }), COLUMNS))).toEqual([
       'Delta',
     ]);
   });
 
   it('matches a select column filter exactly', () => {
-    expect(names(filterRows(ROWS, query({ columnFilters: { region: 'us-east-1' } }), COLUMNS))) //
+    expect(names(filterRows(ROWS, query({ columnFilters: { region: ['us-east-1'] } }), COLUMNS))) //
       .toEqual(['Beta', 'Delta']);
-    expect(filterRows(ROWS, query({ columnFilters: { region: 'us-east' } }), COLUMNS)).toEqual([]);
+    expect(filterRows(ROWS, query({ columnFilters: { region: ['us-east'] } }), COLUMNS)).toEqual([]);
   });
 
   it('treats an empty filter value as inactive', () => {
-    expect(filterRows(ROWS, query({ columnFilters: { region: '' } }), COLUMNS)).toBe(ROWS);
+    expect(filterRows(ROWS, query({ columnFilters: { region: [] } }), COLUMNS)).toBe(ROWS);
+  });
+
+  it('widens a column on several values rather than narrowing it', () => {
+    const result = filterRows(
+      ROWS,
+      query({ columnFilters: { tier: ['gold', 'bronze'] } }),
+      MULTI_COLUMNS,
+    );
+
+    expect(names(result)).toEqual(['Alpha', 'Beta', 'Delta']);
+  });
+
+  it('still requires every filtered column to match', () => {
+    const result = filterRows(
+      ROWS,
+      query({ columnFilters: { tier: ['gold', 'bronze'], region: ['us-east-1'] } }),
+      MULTI_COLUMNS,
+    );
+
+    expect(names(result)).toEqual(['Beta', 'Delta']);
+  });
+
+  it('matches multi-select values exactly, like a single select', () => {
+    expect(filterRows(ROWS, query({ columnFilters: { tier: ['gol'] } }), MULTI_COLUMNS)).toEqual([]);
   });
 
   it('combines column filters and search with AND', () => {
     const result = filterRows(
       ROWS,
-      query({ search: 'a', columnFilters: { region: 'eu-west-1' } }),
+      query({ search: 'a', columnFilters: { region: ['eu-west-1'] } }),
       COLUMNS,
     );
 
@@ -147,7 +177,7 @@ describe('applyQuery', () => {
   it('filters, then sorts, then pages', () => {
     const result = applyQuery(
       ROWS,
-      query({ columnFilters: { region: 'eu-west-1' }, sortKey: 'score', pageSize: 1 }),
+      query({ columnFilters: { region: ['eu-west-1'] }, sortKey: 'score', pageSize: 1 }),
       COLUMNS,
     );
 

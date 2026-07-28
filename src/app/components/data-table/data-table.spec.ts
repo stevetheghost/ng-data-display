@@ -172,7 +172,7 @@ describe('DataTable', () => {
       await type('[aria-label="Filter by Name"]', 'gam');
 
       expect(firstColumnValues()).toEqual(['Gamma']);
-      expect(host.query().columnFilters).toEqual({ name: 'gam' });
+      expect(host.query().columnFilters).toEqual({ name: ['gam'] });
     });
 
     it('renders a select filter with derived options', async () => {
@@ -190,6 +190,92 @@ describe('DataTable', () => {
 
       await choose('select[aria-label="Filter by Name"]', 'Beta');
       expect(firstColumnValues()).toEqual(['Beta']);
+    });
+
+    describe('multi-select', () => {
+      const check = async (option: string) => {
+        const box = [...el.querySelectorAll<HTMLInputElement>('.dropdown input[type="checkbox"]')] //
+          .find((input) => input.closest('label')?.textContent?.trim() === option)!;
+        box.click();
+        await fixture.whenStable();
+      };
+
+      const summaryText = () => el.querySelector('.dropdown summary')?.textContent?.trim();
+
+      beforeEach(async () => {
+        host.columns.set([
+          { key: 'name', header: 'Name', filter: 'multiselect' },
+          { key: 'score', header: 'Score' },
+        ]);
+        await fixture.whenStable();
+      });
+
+      it('lists every value as a checkbox', () => {
+        const labels = [...el.querySelectorAll('.dropdown label')].map((l) => l.textContent?.trim());
+
+        expect(labels).toEqual(['Alpha', 'Beta', 'Gamma']);
+      });
+
+      it('keeps rows matching any ticked value', async () => {
+        await check('Beta');
+        expect(firstColumnValues()).toEqual(['Beta']);
+
+        await check('Gamma');
+        expect(firstColumnValues()).toEqual(['Beta', 'Gamma']);
+        expect(host.query().columnFilters).toEqual({ name: ['Beta', 'Gamma'] });
+      });
+
+      it('unticking a value narrows back down', async () => {
+        await check('Beta');
+        await check('Gamma');
+        await check('Beta');
+
+        expect(firstColumnValues()).toEqual(['Gamma']);
+      });
+
+      it('summarises the selection on the button', async () => {
+        expect(summaryText()).toContain('All');
+
+        await check('Beta');
+        expect(summaryText()).toContain('Beta');
+
+        await check('Gamma');
+        expect(summaryText()).toContain('2 selected');
+      });
+
+      it('names the control and its state for assistive tech', async () => {
+        await check('Beta');
+
+        expect(el.querySelector('.dropdown summary')?.getAttribute('aria-label')) //
+          .toBe('Filter by Name: Beta');
+        expect(el.querySelector('.dropdown legend')?.textContent?.trim()).toBe('Name');
+      });
+
+      it('clears every value at once', async () => {
+        await check('Beta');
+        await check('Gamma');
+
+        el.querySelector<HTMLButtonElement>('.dropdown button')!.click();
+        await fixture.whenStable();
+
+        expect(firstColumnValues()).toEqual(['Beta', 'Alpha', 'Gamma']);
+        expect(host.query().columnFilters).toEqual({ name: [] });
+      });
+
+      it('returns to the first page when the selection changes', async () => {
+        host.rows.set(TWELVE);
+        host.columns.set([
+          { key: 'name', header: 'Name', filter: 'multiselect' },
+          { key: 'score', header: 'Score' },
+        ]);
+        await fixture.whenStable();
+
+        await click('Next page');
+        expect(host.query().pageIndex).toBe(1);
+
+        await check('Row 01');
+        expect(host.query().pageIndex).toBe(0);
+      });
     });
 
     it('omits the filter row when no column asks for one', async () => {

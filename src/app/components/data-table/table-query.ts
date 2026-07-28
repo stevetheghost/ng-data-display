@@ -17,12 +17,16 @@ export interface Column<T> {
   readonly sortable?: boolean;
   /** Overrides the displayed text. The raw value is still used for sorting. */
   readonly format?: (row: T) => string;
-  /** Renders a per-column filter control beneath the header. */
-  readonly filter?: 'text' | 'select';
   /**
-   * Choices for `filter: 'select'`. Derived from the rows when omitted, which
-   * only works client-side — a server-driven table sees one page, so it must
-   * pass the full list.
+   * Renders a per-column filter control beneath the header. `text` matches a
+   * substring; `select` picks one exact value; `multiselect` accepts several,
+   * and a row passes if it matches any of them.
+   */
+  readonly filter?: 'text' | 'select' | 'multiselect';
+  /**
+   * Choices for `filter: 'select'` and `filter: 'multiselect'`. Derived from the
+   * rows when omitted, which only works client-side — a server-driven table sees
+   * one page, so it must pass the full list.
    */
   readonly filterOptions?: readonly string[];
   /** Excluded from the global search when false. */
@@ -33,8 +37,12 @@ export interface Column<T> {
 export interface TableQuery {
   /** Global search, matched against every searchable column. */
   readonly search: string;
-  /** Per-column filter values, keyed by column key. Empty string means inactive. */
-  readonly columnFilters: Readonly<Record<string, string>>;
+  /**
+   * Per-column filter values, keyed by column key. Always a list so one shape
+   * covers every filter type: `text` and `select` hold at most one entry,
+   * `multiselect` holds as many as are ticked. An empty list means inactive.
+   */
+  readonly columnFilters: Readonly<Record<string, readonly string[]>>;
   readonly sortKey: string | null;
   readonly sortDirection: SortDirection;
   readonly pageIndex: number;
@@ -82,20 +90,25 @@ export function filterRows<T>(
   columns: readonly Column<T>[],
 ): readonly T[] {
   const search = query.search.trim().toLowerCase();
-  const active = Object.entries(query.columnFilters).filter(([, value]) => value !== '');
+  const active = Object.entries(query.columnFilters).filter(([, values]) => values.length > 0);
   if (!search && active.length === 0) return rows;
 
   const byKey = new Map(columns.map((column) => [column.key as string, column]));
 
   return rows.filter((row) => {
-    for (const [key, value] of active) {
+    for (const [key, values] of active) {
       const column = byKey.get(key);
       if (!column) continue;
 
       const cell = cellText(row, column).toLowerCase();
-      const needle = value.toLowerCase();
-      // A select offers whole values, so anything but an exact hit is a mis-click.
-      const hit = column.filter === 'select' ? cell === needle : cell.includes(needle);
+      // Selects offer whole values, so anything but an exact hit is a mis-click.
+      // Several ticked values widen the column rather than narrowing it: a row
+      // passes on any one of them, while separate columns still all have to pass.
+      const exact = column.filter === 'select' || column.filter === 'multiselect';
+      const hit = values.some((value) => {
+        const needle = value.toLowerCase();
+        return exact ? cell === needle : cell.includes(needle);
+      });
       if (!hit) return false;
     }
 

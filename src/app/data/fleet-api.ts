@@ -11,8 +11,10 @@ export interface FleetRequest {
   readonly search: string;
   /** Substring match on the service name. */
   readonly name: string;
-  readonly region: string;
-  readonly status: string;
+  /** Accepted regions. Empty means every region. */
+  readonly regions: readonly string[];
+  /** Accepted statuses. Empty means every status. */
+  readonly statuses: readonly string[];
   readonly sortKey: string | null;
   readonly sortDirection: SortDirection;
   readonly pageIndex: number;
@@ -23,9 +25,9 @@ export interface FleetRequest {
 export function toFleetRequest(query: TableQuery): FleetRequest {
   return {
     search: query.search.trim(),
-    name: query.columnFilters['name'] ?? '',
-    region: query.columnFilters['region'] ?? '',
-    status: query.columnFilters['status'] ?? '',
+    name: query.columnFilters['name']?.[0] ?? '',
+    regions: query.columnFilters['region'] ?? [],
+    statuses: query.columnFilters['status'] ?? [],
     sortKey: query.sortKey,
     sortDirection: query.sortDirection,
     pageIndex: query.pageIndex,
@@ -53,8 +55,8 @@ export class FleetApi {
     const matched = this.fleet
       .services()
       .filter((s) => !name || s.name.toLowerCase().includes(name))
-      .filter((s) => !request.region || s.region === request.region)
-      .filter((s) => !request.status || s.status === request.status)
+      .filter((s) => !request.regions.length || request.regions.includes(s.region))
+      .filter((s) => !request.statuses.length || request.statuses.includes(s.status))
       .filter(
         (s) =>
           !search ||

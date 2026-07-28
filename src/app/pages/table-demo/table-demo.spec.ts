@@ -34,6 +34,16 @@ describe('TableDemo', () => {
     await settle();
   }
 
+  const regionBoxes = () => [
+    ...el.querySelectorAll<HTMLInputElement>('.dropdown input[type="checkbox"]'),
+  ];
+
+  /** Ticks one region in the multi-select column filter. */
+  async function tickRegion(region: string): Promise<void> {
+    regionBoxes().find((box) => box.closest('label')?.textContent?.trim() === region)!.click();
+    await settle();
+  }
+
   /** Lets the debounce and the simulated round trip both land. */
   async function settle(): Promise<void> {
     await fixture.whenStable();
@@ -69,10 +79,9 @@ describe('TableDemo', () => {
   });
 
   it('offers every region as a filter option, not just the visible page', () => {
-    const options = [...el.querySelectorAll<HTMLOptionElement>('[aria-label="Filter by Region"] option')];
     const regions = new Set(FLEET.map((s) => s.region));
 
-    expect(options.length).toBe(regions.size + 1);
+    expect(regionBoxes().length).toBe(regions.size);
   });
 
   describe.each(['Client-side', 'Server-side'])('%s', (mode) => {
@@ -87,9 +96,30 @@ describe('TableDemo', () => {
     });
 
     it('filters by region', async () => {
-      await choose('[aria-label="Filter by Region"]', 'eu-west-1');
+      await tickRegion('eu-west-1');
 
       const expected = FLEET.filter((s) => s.region === 'eu-west-1').length;
+      expect(el.textContent).toContain(`of ${expected}`);
+    });
+
+    it('widens to both regions when a second one is ticked', async () => {
+      await tickRegion('eu-west-1');
+      await tickRegion('us-east-1');
+
+      const expected = FLEET.filter(
+        (s) => s.region === 'eu-west-1' || s.region === 'us-east-1',
+      ).length;
+      expect(el.textContent).toContain(`of ${expected}`);
+    });
+
+    it('combines the region multi-select with the status select', async () => {
+      await tickRegion('eu-west-1');
+      await tickRegion('us-east-1');
+      await choose('[aria-label="Filter by Status"]', 'healthy');
+
+      const expected = FLEET.filter(
+        (s) => ['eu-west-1', 'us-east-1'].includes(s.region) && s.status === 'healthy',
+      ).length;
       expect(el.textContent).toContain(`of ${expected}`);
     });
 

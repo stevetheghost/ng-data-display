@@ -21,7 +21,7 @@
     </div>
   }
 
-  <div class="overflow-x-auto">
+  <div [class]="anyFilterOpen() ? 'overflow-visible' : 'overflow-x-auto'">
     <table class="table table-zebra" [class]="loading() ? 'opacity-60' : ''">
       <caption class="sr-only">{{ caption() }}</caption>
 
@@ -58,6 +58,15 @@
             @for (column of columns(); track column.key) {
               <td class="px-4 pt-2 pb-3">
                 @switch (column.filter) {
+                  @case ('multiselect') {
+                    <app-multi-select-filter
+                      [label]="column.header"
+                      [options]="optionsFor(column)"
+                      [selected]="filterValues(column)"
+                      (selectedChange)="setColumnFilter(column, $event)"
+                      (openChange)="onFilterOpen(column, $event)"
+                    />
+                  }
                   @case ('select') {
                     <select
                       class="select select-sm w-full font-normal normal-case"

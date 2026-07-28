@@ -53,7 +53,12 @@ export class TableDemo {
   /** Select options come from the whole fleet: server mode only ever sees one page. */
   protected readonly columns = computed<readonly Column<ServiceMetric>[]>(() => [
     { key: 'name', header: 'Service', filter: 'text' },
-    { key: 'region', header: 'Region', filter: 'select', filterOptions: this.fleet.regions() },
+    {
+      key: 'region',
+      header: 'Region',
+      filter: 'multiselect',
+      filterOptions: this.fleet.regions(),
+    },
     { key: 'status', header: 'Status', filter: 'select', filterOptions: this.fleet.statuses() },
     {
       key: 'requests',
