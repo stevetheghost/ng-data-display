@@ -10,6 +10,7 @@ interface NavItem {
 const NAV: readonly NavItem[] = [
   { path: '/stat-tiles', label: 'Stat tiles', description: 'Headline numbers with deltas' },
   { path: '/data-table', label: 'Data table', description: 'Sortable, filterable rows' },
+  { path: '/data-list', label: 'Data list', description: 'The same rows, one per line' },
   { path: '/card-grid', label: 'Card grid', description: 'Scannable card layout' },
 ];
 

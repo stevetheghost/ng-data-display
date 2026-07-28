@@ -13,6 +13,11 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/table-demo/table-demo').then((m) => m.TableDemo),
   },
   {
+    path: 'data-list',
+    title: 'Data list · ng-data-display',
+    loadComponent: () => import('./pages/list-demo/list-demo').then((m) => m.ListDemo),
+  },
+  {
     path: 'card-grid',
     title: 'Card grid · ng-data-display',
     loadComponent: () => import('./pages/cards-demo/cards-demo').then((m) => m.CardsDemo),
