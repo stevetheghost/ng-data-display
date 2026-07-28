@@ -1,0 +1,48 @@
+<header>
+  <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Data table</h1>
+  <p class="mt-2 max-w-2xl text-slate-600">
+    <code class="rounded bg-slate-100 px-1.5 py-0.5 text-sm">&lt;app-data-table&gt;</code> takes rows
+    plus a column config and owns sorting only — filtering stays with the page, so the same table
+    backs any set of controls. Column headers are buttons that carry
+    <code class="rounded bg-slate-100 px-1.5 py-0.5 text-sm">aria-sort</code>; the status column opts
+    out of text rendering with
+    <code class="rounded bg-slate-100 px-1.5 py-0.5 text-sm">appCellTemplate</code>.
+  </p>
+</header>
+
+<form [formGroup]="filters" class="mt-8 flex flex-wrap items-end gap-4">
+  <div class="flex flex-col gap-1.5">
+    <label for="query" class="text-sm font-medium text-slate-700">Filter by name</label>
+    <input
+      id="query"
+      type="search"
+      formControlName="query"
+      placeholder="e.g. search"
+      class="w-64 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-700"
+    />
+  </div>
+
+  <div class="flex flex-col gap-1.5">
+    <label for="region" class="text-sm font-medium text-slate-700">Region</label>
+    <select
+      id="region"
+      formControlName="region"
+      class="w-48 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-700"
+    >
+      <option value="">All regions</option>
+      @for (region of regions(); track region) {
+        <option [value]="region">{{ region }}</option>
+      }
+    </select>
+  </div>
+
+  <p aria-live="polite" class="py-2 text-sm text-slate-600">{{ resultSummary() }}</p>
+</form>
+
+<div class="mt-6">
+  <app-data-table [rows]="rows()" [columns]="columns" caption="Service health, last hour">
+    <ng-template appCellTemplate="status" let-row>
+      <app-status-badge [status]="row.status" />
+    </ng-template>
+  </app-data-table>
+</div>

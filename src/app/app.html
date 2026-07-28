@@ -1,0 +1,43 @@
+<a
+  href="#main"
+  class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-slate-900 focus:px-4 focus:py-2 focus:text-white"
+>
+  Skip to main content
+</a>
+
+<div class="min-h-dvh bg-slate-50 text-slate-900 lg:flex">
+  <header class="border-b border-slate-200 bg-white lg:w-72 lg:shrink-0 lg:border-b-0 lg:border-r">
+    <div class="p-6">
+      <p class="text-lg font-semibold tracking-tight">ng-data-display</p>
+      <p class="mt-1 text-sm text-slate-600">Data-display components for Angular</p>
+    </div>
+
+    <nav aria-label="Component showcase" class="px-3 pb-6">
+      <ul role="list" class="flex flex-col gap-1">
+        @for (item of nav; track item.path) {
+          <li>
+            <a
+              [routerLink]="item.path"
+              routerLinkActive="bg-slate-900 text-white hover:bg-slate-900"
+              #link="routerLinkActive"
+              [attr.aria-current]="link.isActive ? 'page' : null"
+              class="block rounded-lg px-3 py-2.5 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700"
+            >
+              <span class="block text-sm font-medium">{{ item.label }}</span>
+              <span
+                class="mt-0.5 block text-xs"
+                [class]="link.isActive ? 'text-slate-300' : 'text-slate-500'"
+              >
+                {{ item.description }}
+              </span>
+            </a>
+          </li>
+        }
+      </ul>
+    </nav>
+  </header>
+
+  <main id="main" tabindex="-1" class="flex-1 p-6 lg:p-10">
+    <router-outlet />
+  </main>
+</div>

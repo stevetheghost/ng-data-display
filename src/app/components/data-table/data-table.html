@@ -1,0 +1,69 @@
+<div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-xs">
+  <table class="w-full border-collapse text-sm">
+    <caption class="sr-only">{{ caption() }}</caption>
+
+    <thead>
+      <tr class="border-b border-slate-200 bg-slate-50">
+        @for (column of columns(); track column.key) {
+          <th
+            scope="col"
+            class="p-0 font-semibold text-slate-700"
+            [class]="column.align === 'end' ? 'text-right' : 'text-left'"
+            [attr.aria-sort]="isSortable(column) ? ariaSort(column) : null"
+          >
+            @if (isSortable(column)) {
+              <button
+                type="button"
+                class="flex w-full items-center gap-1.5 px-4 py-3 hover:bg-slate-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sky-700"
+                [class]="column.align === 'end' ? 'justify-end' : 'justify-start'"
+                (click)="toggleSort(column)"
+              >
+                {{ column.header }}
+                <span class="text-xs text-slate-500" aria-hidden="true">
+                  {{ sortIndicator(column) }}
+                </span>
+              </button>
+            } @else {
+              <span class="block px-4 py-3">{{ column.header }}</span>
+            }
+          </th>
+        }
+      </tr>
+    </thead>
+
+    <tbody>
+      @for (row of sortedRows(); track row.id) {
+        <tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+          @for (column of columns(); track column.key) {
+            @if ($first) {
+              <th scope="row" class="px-4 py-3 text-left font-medium text-slate-900">
+                <ng-container
+                  [ngTemplateOutlet]="templateFor(column) ?? defaultCell"
+                  [ngTemplateOutletContext]="{ $implicit: row, column: column }"
+                />
+              </th>
+            } @else {
+              <td
+                class="px-4 py-3 text-slate-700"
+                [class]="column.align === 'end' ? 'text-right tabular-nums' : 'text-left'"
+              >
+                <ng-container
+                  [ngTemplateOutlet]="templateFor(column) ?? defaultCell"
+                  [ngTemplateOutletContext]="{ $implicit: row, column: column }"
+                />
+              </td>
+            }
+          }
+        </tr>
+      } @empty {
+        <tr>
+          <td [attr.colspan]="columns().length" class="px-4 py-10 text-center text-slate-500">
+            {{ emptyMessage() }}
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>
+
+<ng-template #defaultCell let-row let-column="column">{{ cell(row, column) }}</ng-template>
