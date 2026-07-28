@@ -137,6 +137,33 @@ describe('DataTable', () => {
       expect(firstColumnValues()).toEqual(['Gamma', 'Beta', 'Alpha']);
     });
 
+    it('clears the sort on the third click, restoring source order', async () => {
+      await clickHeader('Name');
+      await clickHeader('Name');
+      await clickHeader('Name');
+
+      expect(firstColumnValues()).toEqual(['Beta', 'Alpha', 'Gamma']);
+      expect(host.query()).toMatchObject({ sortKey: null });
+      expect(headerFor('Name').getAttribute('aria-sort')).toBe('none');
+    });
+
+    it('starts a cleared column over at ascending', async () => {
+      await clickHeader('Name');
+      await clickHeader('Name');
+      await clickHeader('Name');
+      await clickHeader('Name');
+
+      expect(firstColumnValues()).toEqual(['Alpha', 'Beta', 'Gamma']);
+    });
+
+    it('starts at ascending when the sort moves to another column', async () => {
+      await clickHeader('Name');
+      await clickHeader('Name');
+      await clickHeader('Score');
+
+      expect(host.query()).toMatchObject({ sortKey: 'score', sortDirection: 'asc' });
+    });
+
     it('sorts numbers numerically rather than lexically', async () => {
       await clickHeader('Score');
       expect(firstColumnValues()).toEqual(['Gamma', 'Beta', 'Alpha']);

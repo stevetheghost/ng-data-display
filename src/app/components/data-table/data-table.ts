@@ -183,15 +183,24 @@ export class DataTable<T extends { id: string }> {
     return column.sortable !== false;
   }
 
+  /**
+   * Cycles the column through ascending, descending, then off — so the third
+   * click puts the rows back in source order, which nothing else offers once a
+   * sort has been applied.
+   */
   protected toggleSort(column: Column<T>): void {
     if (!this.isSortable(column)) return;
 
     this.query.update((q) => {
       const repeat = q.sortKey === column.key;
+      if (repeat && q.sortDirection === 'desc') {
+        return { ...q, sortKey: null, sortDirection: 'asc', pageIndex: 0 };
+      }
+
       return {
         ...q,
         sortKey: column.key,
-        sortDirection: repeat && q.sortDirection === 'asc' ? 'desc' : 'asc',
+        sortDirection: repeat ? 'desc' : 'asc',
         pageIndex: 0,
       };
     });
