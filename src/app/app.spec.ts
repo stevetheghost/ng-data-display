@@ -21,12 +21,10 @@ describe('App', () => {
     const el = await render();
     const links = el.querySelectorAll('nav a');
 
-    expect(links.length).toBe(5);
-    expect(el.textContent).toContain('Stat tiles');
+    expect(links.length).toBe(3);
     expect(el.textContent).toContain('Data table');
     expect(el.textContent).toContain('CDK data table');
     expect(el.textContent).toContain('Data list');
-    expect(el.textContent).toContain('Card grid');
   });
 
   it('offers a skip link to the main landmark', async () => {

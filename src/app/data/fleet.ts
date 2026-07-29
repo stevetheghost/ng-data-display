@@ -43,8 +43,7 @@ const ROLES = ['Service', 'Worker', 'Gateway', 'Cache', 'Queue', 'Sync'] as cons
  */
 export const FLEET: readonly ServiceMetric[] = buildFleet();
 
-/** Backs the data table demo. Kept apart from `Metrics`, whose eight hand-written
- *  services are the right size for the tile and card grids. */
+/** Backs the table and list demos. */
 @Injectable({ providedIn: 'root' })
 export class Fleet {
   private readonly all = signal<readonly ServiceMetric[]>(FLEET);
