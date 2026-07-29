@@ -1,9 +1,9 @@
-import { Component, signal } from '@angular/core';
+import { Component, WritableSignal, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { CellTemplate } from './cell-template';
-import { DataTable } from './data-table';
-import { Column, TableMode, TableQuery, emptyQuery } from './table-query';
+import { CellTemplate } from '../data-table/cell-template';
+import { Column, TableMode, TableQuery, emptyQuery } from '../data-table/table-query';
+import { CdkDataTable } from './cdk-data-table';
 
 interface Row {
   id: string;
@@ -30,22 +30,21 @@ const TWELVE: readonly Row[] = Array.from({ length: 12 }, (_, i) => ({
 }));
 
 @Component({
-  imports: [DataTable, CellTemplate],
+  imports: [CdkDataTable, CellTemplate],
   template: `
-    <app-data-table
+    <app-cdk-data-table
       [rows]="rows()"
       [columns]="columns()"
       [mode]="mode()"
       [total]="total()"
       [loading]="loading()"
-      [searchDebounceMs]="debounce()"
       [(query)]="query"
       caption="Test rows"
     >
       <ng-template appCellTemplate="score" let-row>
         <span data-testid="custom">custom {{ row.score }}</span>
       </ng-template>
-    </app-data-table>
+    </app-cdk-data-table>
   `,
 })
 class Host {
@@ -54,11 +53,19 @@ class Host {
   readonly mode = signal<TableMode>('client');
   readonly total = signal<number | null>(null);
   readonly loading = signal(false);
-  readonly debounce = signal(0);
   readonly query = signal<TableQuery>(emptyQuery());
 }
 
-describe('DataTable', () => {
+interface HostInputs {
+  columns: readonly Column<Row>[];
+  rows: readonly Row[];
+  mode: TableMode;
+  total: number | null;
+  loading: boolean;
+  query: TableQuery;
+}
+
+describe('CdkDataTable', () => {
   let fixture: ComponentFixture<Host>;
   let host: Host;
   let el: HTMLElement;
@@ -67,7 +74,10 @@ describe('DataTable', () => {
     [...el.querySelectorAll('th[scope="col"]')].find((th) => th.textContent?.includes(name))!;
 
   const firstColumnValues = () =>
-    [...el.querySelectorAll('tbody th[scope="row"]')].map((th) => th.textContent?.trim());
+    [...el.querySelectorAll('tbody tr td:first-child')].map((td) => td.textContent?.trim());
+
+  const footerValues = () =>
+    [...el.querySelectorAll('tfoot td')].map((td) => td.textContent?.trim());
 
   const buttonFor = (label: string) =>
     [...el.querySelectorAll('button')].find((b) => b.textContent?.includes(label))!;
@@ -96,6 +106,14 @@ describe('DataTable', () => {
     await fixture.whenStable();
   }
 
+  /** Drives the host's inputs the way a parent template would, then settles. */
+  async function set(inputs: Partial<HostInputs>): Promise<void> {
+    for (const [key, value] of Object.entries(inputs)) {
+      (host[key as keyof HostInputs] as WritableSignal<unknown>).set(value);
+    }
+    await fixture.whenStable();
+  }
+
   beforeEach(async () => {
     await TestBed.configureTestingModule({ imports: [Host] }).compileComponents();
     fixture = TestBed.createComponent(Host);
@@ -105,8 +123,17 @@ describe('DataTable', () => {
   });
 
   describe('rendering', () => {
-    it('renders rows in source order until a column is sorted', () => {
+    it('renders a native table through the CDK row and column defs', () => {
+      expect(el.querySelector('table.cdk-table')).toBeTruthy();
       expect(firstColumnValues()).toEqual(['Beta', 'Alpha', 'Gamma']);
+    });
+
+    it('renders one column def per column, in order', () => {
+      const headers = [...el.querySelectorAll('th[scope="col"]')].map((th) =>
+        th.textContent?.trim(),
+      );
+
+      expect(headers.map((header) => header?.replace(/\s+\S+$/, ''))).toEqual(['Name', 'Score']);
     });
 
     it('renders a projected template instead of the formatted value', () => {
@@ -116,9 +143,8 @@ describe('DataTable', () => {
       expect(el.textContent).not.toContain('20 pts');
     });
 
-    it('shows the empty message when there are no rows', async () => {
-      host.rows.set([]);
-      await fixture.whenStable();
+    it('shows the CDK no-data row when there are no rows', async () => {
+      await set({ rows: [] });
 
       expect(el.textContent).toContain('No rows match the current filters.');
       expect(el.querySelector('tbody td')?.getAttribute('colspan')).toBe('2');
@@ -126,6 +152,66 @@ describe('DataTable', () => {
 
     it('labels the table with a caption for assistive tech', () => {
       expect(el.querySelector('caption')?.textContent?.trim()).toBe('Test rows');
+    });
+  });
+
+  describe('sticky rows', () => {
+    it('sticks both header rows by default', () => {
+      const stuck = el.querySelectorAll('thead th.cdk-table-sticky');
+
+      // Two rows of two columns: the headers and the filters beneath them.
+      expect(stuck).toHaveLength(4);
+    });
+
+    it('sticks the footer to the bottom of the scroll box', () => {
+      expect(el.querySelectorAll('tfoot td.cdk-table-sticky')).toHaveLength(2);
+    });
+
+    it('caps the body height so there is something to stick to', () => {
+      expect(el.querySelector<HTMLElement>('.overflow-auto')?.style.maxHeight).toBe('32rem');
+    });
+  });
+
+  describe('footer row', () => {
+    beforeEach(async () => {
+      await set({
+        columns: [
+          { key: 'name', header: 'Name', footer: (rows) => `${rows.length} shown` },
+          {
+            key: 'score',
+            header: 'Score',
+            footer: (rows) => `${rows.reduce((total, row) => total + row.score, 0)}`,
+          },
+        ],
+      });
+    });
+
+    it('summarises the rendered rows', () => {
+      expect(footerValues()).toEqual(['3 shown', '60']);
+    });
+
+    it('follows the filtered set', async () => {
+      await type('input[type="search"]', 'al');
+
+      expect(footerValues()).toEqual(['1 shown', '30']);
+    });
+
+    it('is hidden once no column defines one', async () => {
+      await set({ columns: COLUMNS });
+
+      expect(el.querySelector('tfoot tr')?.classList.contains('hidden')).toBe(true);
+      expect(footerValues()).toEqual(['', '']);
+    });
+
+    it('appears when a footer is added to a column set that had none', async () => {
+      await set({ columns: COLUMNS });
+
+      await set({
+        columns: [{ ...COLUMNS[0], footer: (rows) => `${rows.length} shown` }, COLUMNS[1]],
+      });
+
+      expect(el.querySelector('tfoot tr')?.classList.contains('hidden')).toBe(false);
+      expect(footerValues()).toEqual(['3 shown', '']);
     });
   });
 
@@ -145,28 +231,11 @@ describe('DataTable', () => {
 
       expect(firstColumnValues()).toEqual(['Beta', 'Alpha', 'Gamma']);
       expect(host.query()).toMatchObject({ sortKey: null });
-      expect(headerFor('Name').getAttribute('aria-sort')).toBe('none');
-    });
-
-    it('starts a cleared column over at ascending', async () => {
-      await clickHeader('Name');
-      await clickHeader('Name');
-      await clickHeader('Name');
-      await clickHeader('Name');
-
-      expect(firstColumnValues()).toEqual(['Alpha', 'Beta', 'Gamma']);
-    });
-
-    it('starts at ascending when the sort moves to another column', async () => {
-      await clickHeader('Name');
-      await clickHeader('Name');
-      await clickHeader('Score');
-
-      expect(host.query()).toMatchObject({ sortKey: 'score', sortDirection: 'asc' });
     });
 
     it('sorts numbers numerically rather than lexically', async () => {
       await clickHeader('Score');
+
       expect(firstColumnValues()).toEqual(['Gamma', 'Beta', 'Alpha']);
     });
 
@@ -179,12 +248,6 @@ describe('DataTable', () => {
 
       await clickHeader('Name');
       expect(headerFor('Name').getAttribute('aria-sort')).toBe('descending');
-    });
-
-    it('publishes the sort through the query model', async () => {
-      await clickHeader('Score');
-
-      expect(host.query()).toMatchObject({ sortKey: 'score', sortDirection: 'asc' });
     });
   });
 
@@ -204,118 +267,65 @@ describe('DataTable', () => {
     });
 
     it('renders a select filter with derived options', async () => {
-      host.columns.set([
-        { key: 'name', header: 'Name', filter: 'select' },
-        { key: 'score', header: 'Score' },
-      ]);
-      await fixture.whenStable();
+      await set({
+        columns: [
+          { key: 'name', header: 'Name', filter: 'select' },
+          { key: 'score', header: 'Score' },
+        ],
+      });
 
       const options = [...el.querySelectorAll<HTMLOptionElement>('select[aria-label] option')].map(
         (o) => o.value,
       );
-
       expect(options).toEqual(['', 'Alpha', 'Beta', 'Gamma']);
 
       await choose('select[aria-label="Filter by Name"]', 'Beta');
       expect(firstColumnValues()).toEqual(['Beta']);
     });
 
-    describe('multi-select', () => {
+    it('keeps rows matching any ticked value of a multi-select', async () => {
+      await set({
+        columns: [
+          { key: 'name', header: 'Name', filter: 'multiselect' },
+          { key: 'score', header: 'Score' },
+        ],
+      });
+
       const check = async (option: string) => {
-        const box = [...el.querySelectorAll<HTMLInputElement>('.dropdown input[type="checkbox"]')] //
-          .find((input) => input.closest('label')?.textContent?.trim() === option)!;
-        box.click();
+        [...el.querySelectorAll<HTMLInputElement>('.dropdown input[type="checkbox"]')]
+          .find((input) => input.closest('label')?.textContent?.trim() === option)!
+          .click();
         await fixture.whenStable();
       };
 
-      const summaryText = () => el.querySelector('.dropdown summary')?.textContent?.trim();
+      await check('Beta');
+      await check('Gamma');
 
-      beforeEach(async () => {
-        host.columns.set([
-          { key: 'name', header: 'Name', filter: 'multiselect' },
-          { key: 'score', header: 'Score' },
-        ]);
-        await fixture.whenStable();
-      });
-
-      it('lists every value as a checkbox', () => {
-        const labels = [...el.querySelectorAll('.dropdown label')].map((l) => l.textContent?.trim());
-
-        expect(labels).toEqual(['Alpha', 'Beta', 'Gamma']);
-      });
-
-      it('keeps rows matching any ticked value', async () => {
-        await check('Beta');
-        expect(firstColumnValues()).toEqual(['Beta']);
-
-        await check('Gamma');
-        expect(firstColumnValues()).toEqual(['Beta', 'Gamma']);
-        expect(host.query().columnFilters).toEqual({ name: ['Beta', 'Gamma'] });
-      });
-
-      it('unticking a value narrows back down', async () => {
-        await check('Beta');
-        await check('Gamma');
-        await check('Beta');
-
-        expect(firstColumnValues()).toEqual(['Gamma']);
-      });
-
-      it('summarises the selection on the button', async () => {
-        expect(summaryText()).toContain('All');
-
-        await check('Beta');
-        expect(summaryText()).toContain('Beta');
-
-        await check('Gamma');
-        expect(summaryText()).toContain('2 selected');
-      });
-
-      it('names the control and its state for assistive tech', async () => {
-        await check('Beta');
-
-        expect(el.querySelector('.dropdown summary')?.getAttribute('aria-label')) //
-          .toBe('Filter by Name: Beta');
-        expect(el.querySelector('.dropdown legend')?.textContent?.trim()).toBe('Name');
-      });
-
-      it('clears every value at once', async () => {
-        await check('Beta');
-        await check('Gamma');
-
-        el.querySelector<HTMLButtonElement>('.dropdown button')!.click();
-        await fixture.whenStable();
-
-        expect(firstColumnValues()).toEqual(['Beta', 'Alpha', 'Gamma']);
-        expect(host.query().columnFilters).toEqual({ name: [] });
-      });
-
-      it('returns to the first page when the selection changes', async () => {
-        host.rows.set(TWELVE);
-        host.columns.set([
-          { key: 'name', header: 'Name', filter: 'multiselect' },
-          { key: 'score', header: 'Score' },
-        ]);
-        await fixture.whenStable();
-
-        await click('Next page');
-        expect(host.query().pageIndex).toBe(1);
-
-        await check('Row 01');
-        expect(host.query().pageIndex).toBe(0);
-      });
+      expect(firstColumnValues()).toEqual(['Beta', 'Gamma']);
     });
 
-    it('omits the filter row when no column asks for one', async () => {
-      host.columns.set([{ key: 'name', header: 'Name' }]);
-      await fixture.whenStable();
+    it('hides the filter header row when no column asks for one', async () => {
+      await set({ columns: [{ key: 'name', header: 'Name' }] });
 
+      const rows = el.querySelectorAll('thead tr');
+      expect(rows).toHaveLength(2);
+      expect(rows[1].classList.contains('hidden')).toBe(true);
       expect(el.querySelector('thead [aria-label^="Filter by"]')).toBeNull();
     });
 
+    it('brings the filter row back when a column asks for one again', async () => {
+      await set({ columns: [{ key: 'name', header: 'Name' }] });
+
+      await set({ columns: [{ key: 'name', header: 'Name', filter: 'text' }] });
+
+      expect(el.querySelectorAll('thead tr')[1].classList.contains('hidden')).toBe(false);
+
+      await type('[aria-label="Filter by Name"]', 'gam');
+      expect(firstColumnValues()).toEqual(['Gamma']);
+    });
+
     it('returns to the first page when a filter changes', async () => {
-      host.rows.set(TWELVE);
-      await fixture.whenStable();
+      await set({ rows: TWELVE });
 
       await click('Next page');
       expect(host.query().pageIndex).toBe(1);
@@ -327,13 +337,11 @@ describe('DataTable', () => {
 
   describe('client-side paging', () => {
     beforeEach(async () => {
-      host.rows.set(TWELVE);
-      await fixture.whenStable();
+      await set({ rows: TWELVE });
     });
 
     it('shows only the first page by default', () => {
       expect(firstColumnValues()).toHaveLength(10);
-      expect(firstColumnValues().at(0)).toBe('Row 01');
       expect(el.textContent).toContain('1–10 of 12');
     });
 
@@ -341,26 +349,7 @@ describe('DataTable', () => {
       await click('Next page');
 
       expect(firstColumnValues()).toEqual(['Row 11', 'Row 12']);
-      expect(el.textContent).toContain('11–12 of 12');
       expect(el.textContent).toContain('Page 2 of 2');
-    });
-
-    it('disables the previous and next controls at the ends', async () => {
-      expect(buttonFor('Previous page').disabled).toBe(true);
-      expect(buttonFor('Next page').disabled).toBe(false);
-
-      await click('Last page');
-
-      expect(buttonFor('Next page').disabled).toBe(true);
-      expect(buttonFor('First page').disabled).toBe(false);
-    });
-
-    it('re-pages on a new page size and returns to the first page', async () => {
-      await click('Next page');
-      await choose('select[id^="page-size"]', '25');
-
-      expect(host.query()).toMatchObject({ pageSize: 25, pageIndex: 0 });
-      expect(firstColumnValues()).toHaveLength(12);
     });
 
     it('pages over the filtered set, not the raw rows', async () => {
@@ -369,27 +358,11 @@ describe('DataTable', () => {
       expect(el.textContent).toContain('1–3 of 3');
       expect(firstColumnValues()).toEqual(['Row 10', 'Row 11', 'Row 12']);
     });
-
-    it('falls back to the last page when the match count shrinks', async () => {
-      await click('Next page');
-      host.rows.set(TWELVE.slice(0, 4));
-      await fixture.whenStable();
-
-      expect(firstColumnValues()).toHaveLength(4);
-      expect(el.textContent).toContain('1–4 of 4');
-    });
-
-    it('announces the range politely', () => {
-      expect(el.querySelector('[aria-live="polite"]')?.textContent).toContain('1–10 of 12');
-    });
   });
 
   describe('server mode', () => {
     beforeEach(async () => {
-      host.mode.set('server');
-      host.rows.set(TWELVE.slice(0, 10));
-      host.total.set(57);
-      await fixture.whenStable();
+      await set({ mode: 'server', rows: TWELVE.slice(0, 10), total: 57 });
     });
 
     it('renders the given page verbatim without filtering it', async () => {
@@ -403,13 +376,6 @@ describe('DataTable', () => {
       expect(el.textContent).toContain('Page 1 of 6');
     });
 
-    it('reports the requested page through the query instead of slicing', async () => {
-      await click('Next page');
-
-      expect(host.query().pageIndex).toBe(1);
-      expect(firstColumnValues()).toHaveLength(10);
-    });
-
     it('does not re-sort the page it was handed', async () => {
       const before = firstColumnValues();
       await clickHeader('Score');
@@ -419,53 +385,10 @@ describe('DataTable', () => {
     });
 
     it('marks the table busy and blocks paging while loading', async () => {
-      host.loading.set(true);
-      await fixture.whenStable();
+      await set({ loading: true });
 
       expect(el.querySelector('[aria-busy="true"]')).toBeTruthy();
       expect(buttonFor('Next page').disabled).toBe(true);
-    });
-  });
-
-  describe('search debounce', () => {
-    const settle = async (ms: number) => {
-      await new Promise((resolve) => setTimeout(resolve, ms));
-      await fixture.whenStable();
-    };
-
-    it('holds a server-mode keystroke back until the delay passes', async () => {
-      host.mode.set('server');
-      host.debounce.set(30);
-      await fixture.whenStable();
-
-      await type('input[type="search"]', 'gam');
-      expect(host.query().search).toBe('');
-
-      await settle(60);
-      expect(host.query().search).toBe('gam');
-    });
-
-    it('keeps only the last keystroke of a burst', async () => {
-      host.mode.set('server');
-      host.debounce.set(30);
-      await fixture.whenStable();
-
-      await type('input[type="search"]', 'g');
-      await type('input[type="search"]', 'ga');
-      await type('input[type="search"]', 'gam');
-
-      await settle(60);
-      expect(host.query().search).toBe('gam');
-    });
-
-    it('applies client-mode keystrokes immediately', async () => {
-      host.debounce.set(30);
-      await fixture.whenStable();
-
-      await type('input[type="search"]', 'al');
-
-      expect(host.query().search).toBe('al');
-      expect(firstColumnValues()).toEqual(['Alpha']);
     });
   });
 });

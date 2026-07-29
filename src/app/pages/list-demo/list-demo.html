@@ -40,14 +40,14 @@
 <div class="mt-6">
   <app-data-list
     [rows]="rows()"
-    [fields]="fields()"
+    [columns]="fields()"
     [mode]="mode()"
     [total]="total()"
     [loading]="loading()"
     [(query)]="query"
     searchLabel="Search services"
     searchPlaceholder="e.g. gateway"
-    label="Service health, last hour"
+    caption="Service health, last hour"
   >
     <ng-template appCellTemplate="status" let-row>
       <app-status-badge [status]="row.status" />

@@ -12,14 +12,3 @@ export interface ServiceMetric {
   /** Share of requests that returned 5xx, as a fraction of 1. */
   readonly errorRate: number;
 }
-
-/** A single headline number, as rendered by `StatTile`. */
-export interface Stat {
-  readonly label: string;
-  readonly value: string;
-  /** Change versus the previous period, as a fraction of 1. Omit when unknown. */
-  readonly delta?: number;
-  /** When true, a negative delta is the good outcome (e.g. latency, errors). */
-  readonly lowerIsBetter?: boolean;
-  readonly caption?: string;
-}

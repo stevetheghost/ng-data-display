@@ -31,6 +31,13 @@ export interface Column<T> {
   readonly filterOptions?: readonly string[];
   /** Excluded from the global search when false. */
   readonly searchable?: boolean;
+  /**
+   * Summary for a footer row, over the rows currently rendered — the page in
+   * view, not the whole result set. Rendered by tables that show a footer row
+   * and ignored by those that don't; a footer appears as soon as any column
+   * defines one, and the rest stay blank.
+   */
+  readonly footer?: (rows: readonly T[]) => string;
 }
 
 /** Everything the table knows about what it wants to show. */

@@ -17,7 +17,7 @@
       </div>
     }
 
-    @for (field of filterFields(); track field.key) {
+    @for (field of filterColumns(); track field.key) {
       <div class="flex w-44 flex-col gap-1">
         <span class="text-xs font-medium" aria-hidden="true">{{ field.header }}</span>
 
@@ -27,7 +27,7 @@
               [label]="field.header"
               [options]="optionsFor(field)"
               [selected]="filterValues(field)"
-              (selectedChange)="setFieldFilter(field, $event)"
+              (selectedChange)="setColumnFilter(field, $event)"
             />
           }
           @case ('select') {
@@ -35,7 +35,7 @@
               class="select select-sm w-full"
               [attr.aria-label]="filterLabel(field)"
               [value]="filterValue(field)"
-              (change)="onFieldFilter(field, $event)"
+              (change)="onColumnFilter(field, $event)"
             >
               <option value="">All</option>
               @for (option of optionsFor(field); track option) {
@@ -49,14 +49,14 @@
               class="input input-sm w-full"
               [attr.aria-label]="filterLabel(field)"
               [value]="filterValue(field)"
-              (input)="onFieldFilter(field, $event)"
+              (input)="onColumnFilter(field, $event)"
             />
           }
         }
       </div>
     }
 
-    @if (sortFields().length) {
+    @if (sortableColumns().length) {
       <div class="flex flex-col gap-1">
         <label [attr.for]="sortId" class="text-xs font-medium">{{ sortLabel() }}</label>
 
@@ -68,7 +68,7 @@
             (change)="onSortKey($event)"
           >
             <option value="">Unsorted</option>
-            @for (field of sortFields(); track field.key) {
+            @for (field of sortableColumns(); track field.key) {
               <option [value]="field.key">{{ field.header }}</option>
             }
           </select>
@@ -97,17 +97,17 @@
   <ul
     role="list"
     class="list px-2 py-2"
-    [attr.aria-label]="label()"
-    [class]="loading() ? 'opacity-60' : ''"
+    [attr.aria-label]="caption()"
+    [class.opacity-60]="loading()"
   >
     @for (row of visibleRows(); track row.id) {
       <li class="list-row items-center">
-        @if (leadFields().length) {
+        @if (slots().lead.length) {
           <!-- Each row is its own grid, so a wider badge in one row would indent
                that row's title past the rest. A floor on the lead column keeps
                the titles in a line for lead content up to that width. -->
           <div class="flex min-w-24 flex-col items-start gap-1">
-            @for (field of leadFields(); track field.key) {
+            @for (field of slots().lead; track field.key) {
               <ng-container
                 [ngTemplateOutlet]="templateFor(field) ?? defaultCell"
                 [ngTemplateOutletContext]="{ $implicit: row, field: field }"
@@ -117,7 +117,7 @@
         }
 
         <div class="list-col-grow min-w-0">
-          @for (field of titleFields(); track field.key) {
+          @for (field of slots().title; track field.key) {
             <p class="truncate font-medium">
               <ng-container
                 [ngTemplateOutlet]="templateFor(field) ?? defaultCell"
@@ -126,9 +126,9 @@
             </p>
           }
 
-          @if (metaFields().length) {
+          @if (slots().meta.length) {
             <p class="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-base-content/60">
-              @for (field of metaFields(); track field.key) {
+              @for (field of slots().meta; track field.key) {
                 <span>
                   <span class="sr-only">{{ field.header }}:</span>
                   <ng-container
@@ -144,14 +144,14 @@
           }
         </div>
 
-        @if (detailFields().length) {
+        @if (slots().detail.length) {
           <!-- Wraps under the title on narrow screens, where a row of values and
                a service name cannot both fit without squeezing the name away. -->
           <dl class="flex flex-wrap gap-x-6 gap-y-2 max-sm:list-col-wrap sm:justify-end">
-            @for (field of detailFields(); track field.key) {
+            @for (field of slots().detail; track field.key) {
               <!-- Right-aligned only once the values sit at the end of the row;
                    wrapped under the title they read better ranged left. -->
-              <div [class]="field.align === 'end' ? 'sm:text-right' : ''">
+              <div [class.sm:text-right]="field.align === 'end'">
                 <dt class="text-xs text-base-content/60">{{ field.header }}</dt>
                 <dd class="mt-0.5 font-medium tabular-nums">
                   <ng-container
@@ -184,4 +184,4 @@
   }
 </div>
 
-<ng-template #defaultCell let-row let-field="field">{{ value(row, field) }}</ng-template>
+<ng-template #defaultCell let-row let-field="field">{{ cell(row, field) }}</ng-template>

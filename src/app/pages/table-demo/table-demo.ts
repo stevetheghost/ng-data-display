@@ -8,14 +8,14 @@ import {
   signal,
 } from '@angular/core';
 import { CellTemplate } from '../../components/data-table/cell-template';
+import { DataTable } from '../../components/data-table/data-table';
 import {
   Column,
-  DataTable,
   TableMode,
   TablePage,
   TableQuery,
   emptyQuery,
-} from '../../components/data-table/data-table';
+} from '../../components/data-table/table-query';
 import { StatusBadge } from '../../components/status-badge/status-badge';
 import { Fleet } from '../../data/fleet';
 import { FleetApi, toFleetRequest } from '../../data/fleet-api';

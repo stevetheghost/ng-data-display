@@ -1,0 +1,30 @@
+<header>
+  <h1 class="text-2xl font-semibold tracking-tight">CDK data table</h1>
+  <p class="mt-2 max-w-2xl text-base-content/70">
+    <code class="rounded bg-base-200 px-1.5 py-0.5 text-sm">&lt;app-cdk-data-table&gt;</code> takes
+    the same rows, columns and
+    <code class="rounded bg-base-200 px-1.5 py-0.5 text-sm">query</code> as the hand-rolled table,
+    but builds its markup with
+    <code class="rounded bg-base-200 px-1.5 py-0.5 text-sm">&#64;angular/cdk/table</code>: each
+    column contributes one definition holding its header, cell and footer, and the row definitions
+    pick the columns they render. Scroll the body — the header and the filter row stay pinned to the
+    top and the totals to the bottom, and those totals cover whatever the current page holds.
+  </p>
+</header>
+
+<div class="mt-6">
+  <app-cdk-data-table
+    [rows]="rows()"
+    [columns]="columns()"
+    [(query)]="query"
+    [pageSizeOptions]="[25, 50, 100]"
+    maxHeight="26rem"
+    searchLabel="Search services"
+    searchPlaceholder="e.g. gateway"
+    caption="Service health, last hour"
+  >
+    <ng-template appCellTemplate="status" let-row>
+      <app-status-badge [status]="row.status" />
+    </ng-template>
+  </app-cdk-data-table>
+</div>

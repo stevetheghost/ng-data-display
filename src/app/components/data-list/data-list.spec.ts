@@ -1,8 +1,9 @@
-import { Component, signal } from '@angular/core';
+import { Component, WritableSignal, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { CellTemplate } from '../data-table/cell-template';
-import { DataList, ListField, TableMode, TableQuery, emptyQuery } from './data-list';
+import { TableMode, TableQuery, emptyQuery } from '../data-table/table-query';
+import { DataList, ListField } from './data-list';
 
 interface Row {
   id: string;
@@ -36,13 +37,13 @@ const TWELVE: readonly Row[] = Array.from({ length: 12 }, (_, i) => ({
   template: `
     <app-data-list
       [rows]="rows()"
-      [fields]="fields()"
+      [columns]="fields()"
       [mode]="mode()"
       [total]="total()"
       [loading]="loading()"
       [searchDebounceMs]="debounce()"
       [(query)]="query"
-      label="Test rows"
+      caption="Test rows"
     >
       <ng-template appCellTemplate="score" let-row>
         <span data-testid="custom">custom {{ row.score }}</span>
@@ -58,6 +59,16 @@ class Host {
   readonly loading = signal(false);
   readonly debounce = signal(0);
   readonly query = signal<TableQuery>(emptyQuery());
+}
+
+interface HostInputs {
+  fields: readonly ListField<Row>[];
+  rows: readonly Row[];
+  mode: TableMode;
+  total: number | null;
+  loading: boolean;
+  debounce: number;
+  query: TableQuery;
 }
 
 describe('DataList', () => {
@@ -94,6 +105,20 @@ describe('DataList', () => {
 
   const sortBy = (key: string) => choose('select[id^="list-sort"]', key);
 
+  /** The toolbar search, told apart from the per-field filters by its missing label. */
+  const search = (value: string) => type('input[type="search"]:not([aria-label])', value);
+
+  const optionValues = (selector: string) =>
+    [...el.querySelectorAll<HTMLOptionElement>(`${selector} option`)].map((o) => o.value);
+
+  /** Drives the host's inputs the way a parent template would, then settles. */
+  async function set(inputs: Partial<HostInputs>): Promise<void> {
+    for (const [key, value] of Object.entries(inputs)) {
+      (host[key as keyof HostInputs] as WritableSignal<unknown>).set(value);
+    }
+    await fixture.whenStable();
+  }
+
   beforeEach(async () => {
     await TestBed.configureTestingModule({ imports: [Host] }).compileComponents();
     fixture = TestBed.createComponent(Host);
@@ -123,8 +148,7 @@ describe('DataList', () => {
     });
 
     it('shows the empty message when there are no rows', async () => {
-      host.rows.set([]);
-      await fixture.whenStable();
+      await set({ rows: [] });
 
       expect(el.textContent).toContain('No items match the current filters.');
       expect(el.querySelector('.list-row')).toBeNull();
@@ -137,21 +161,21 @@ describe('DataList', () => {
 
   describe('sorting', () => {
     it('offers every sortable field, plus an unsorted option', () => {
-      const options = [...el.querySelectorAll<HTMLOptionElement>('select[id^="list-sort"] option')];
-
-      expect(options.map((o) => o.value)).toEqual(['', 'name', 'region', 'score']);
-      expect(options[0].textContent?.trim()).toBe('Unsorted');
+      expect(optionValues('select[id^="list-sort"]')).toEqual(['', 'name', 'region', 'score']);
+      expect(el.querySelector('select[id^="list-sort"] option')?.textContent?.trim()).toBe(
+        'Unsorted',
+      );
     });
 
     it('omits a field that opts out of sorting', async () => {
-      host.fields.set([
-        { key: 'name', header: 'Name', slot: 'title' },
-        { key: 'score', header: 'Score', sortable: false },
-      ]);
-      await fixture.whenStable();
+      await set({
+        fields: [
+          { key: 'name', header: 'Name', slot: 'title' },
+          { key: 'score', header: 'Score', sortable: false },
+        ],
+      });
 
-      const values = [...el.querySelectorAll<HTMLOptionElement>('select[id^="list-sort"] option')] //
-        .map((o) => o.value);
+      const values = optionValues('select[id^="list-sort"]');
 
       expect(values).toEqual(['', 'name']);
     });
@@ -187,6 +211,14 @@ describe('DataList', () => {
       expect(host.query().sortKey).toBeNull();
     });
 
+    it('reports no direction once the sort is cleared, matching the tables', async () => {
+      await sortBy('name');
+      await click('Sort descending');
+      await sortBy('');
+
+      expect(host.query()).toMatchObject({ sortKey: null, sortDirection: 'asc' });
+    });
+
     it('sorts numbers numerically rather than lexically', async () => {
       await sortBy('score');
 
@@ -203,7 +235,7 @@ describe('DataList', () => {
 
   describe('filtering', () => {
     it('narrows rows by the global search', async () => {
-      await type('input[type="search"]:not([aria-label])', 'al');
+      await search('al');
 
       expect(titles()).toEqual(['Alpha']);
       expect(host.query().search).toBe('al');
@@ -217,15 +249,14 @@ describe('DataList', () => {
     });
 
     it('renders a select filter with derived options', async () => {
-      host.fields.set([
-        { key: 'name', header: 'Name', slot: 'title' },
-        { key: 'region', header: 'Region', filter: 'select' },
-      ]);
-      await fixture.whenStable();
+      await set({
+        fields: [
+          { key: 'name', header: 'Name', slot: 'title' },
+          { key: 'region', header: 'Region', filter: 'select' },
+        ],
+      });
 
-      const options = [
-        ...el.querySelectorAll<HTMLOptionElement>('select[aria-label="Filter by Region"] option'),
-      ].map((o) => o.value);
+      const options = optionValues('select[aria-label="Filter by Region"]');
 
       expect(options).toEqual(['', 'eu', 'us']);
 
@@ -234,11 +265,12 @@ describe('DataList', () => {
     });
 
     it('keeps rows matching any ticked value of a multiselect', async () => {
-      host.fields.set([
-        { key: 'name', header: 'Name', slot: 'title' },
-        { key: 'region', header: 'Region', filter: 'multiselect' },
-      ]);
-      await fixture.whenStable();
+      await set({
+        fields: [
+          { key: 'name', header: 'Name', slot: 'title' },
+          { key: 'region', header: 'Region', filter: 'multiselect' },
+        ],
+      });
 
       const check = async (option: string) => {
         const box = [...el.querySelectorAll<HTMLInputElement>('.dropdown input[type="checkbox"]')] //
@@ -256,28 +288,25 @@ describe('DataList', () => {
     });
 
     it('omits the toolbar filters when no field asks for one', async () => {
-      host.fields.set([{ key: 'name', header: 'Name', slot: 'title' }]);
-      await fixture.whenStable();
+      await set({ fields: [{ key: 'name', header: 'Name', slot: 'title' }] });
 
       expect(el.querySelector('[aria-label^="Filter by"]')).toBeNull();
     });
 
     it('returns to the first page when a filter changes', async () => {
-      host.rows.set(TWELVE);
-      await fixture.whenStable();
+      await set({ rows: TWELVE });
 
       await click('Next page');
       expect(host.query().pageIndex).toBe(1);
 
-      await type('input[type="search"]:not([aria-label])', 'Row 0');
+      await search('Row 0');
       expect(host.query().pageIndex).toBe(0);
     });
   });
 
   describe('client-side paging', () => {
     beforeEach(async () => {
-      host.rows.set(TWELVE);
-      await fixture.whenStable();
+      await set({ rows: TWELVE });
     });
 
     it('shows only the first page by default', () => {
@@ -302,7 +331,7 @@ describe('DataList', () => {
     });
 
     it('pages over the filtered set, not the raw rows', async () => {
-      await type('input[type="search"]:not([aria-label])', 'Row 1');
+      await search('Row 1');
 
       expect(el.textContent).toContain('1–3 of 3');
       expect(titles()).toEqual(['Row 10', 'Row 11', 'Row 12']);
@@ -310,8 +339,7 @@ describe('DataList', () => {
 
     it('falls back to the last page when the match count shrinks', async () => {
       await click('Next page');
-      host.rows.set(TWELVE.slice(0, 4));
-      await fixture.whenStable();
+      await set({ rows: TWELVE.slice(0, 4) });
 
       expect(titles()).toHaveLength(4);
       expect(el.textContent).toContain('1–4 of 4');
@@ -320,14 +348,11 @@ describe('DataList', () => {
 
   describe('server mode', () => {
     beforeEach(async () => {
-      host.mode.set('server');
-      host.rows.set(TWELVE.slice(0, 10));
-      host.total.set(57);
-      await fixture.whenStable();
+      await set({ mode: 'server', rows: TWELVE.slice(0, 10), total: 57 });
     });
 
     it('renders the given page verbatim without filtering it', async () => {
-      await type('input[type="search"]:not([aria-label])', 'nothing-matches-this');
+      await search('nothing-matches-this');
 
       expect(titles()).toHaveLength(10);
     });
@@ -345,11 +370,10 @@ describe('DataList', () => {
     });
 
     it('debounces the search so a burst of keystrokes costs one query', async () => {
-      host.debounce.set(20);
-      await fixture.whenStable();
+      await set({ debounce: 20 });
 
-      await type('input[type="search"]:not([aria-label])', 'ga');
-      await type('input[type="search"]:not([aria-label])', 'gat');
+      await search('ga');
+      await search('gat');
       expect(host.query().search).toBe('');
 
       await new Promise((resolve) => setTimeout(resolve, 40));
@@ -358,8 +382,7 @@ describe('DataList', () => {
     });
 
     it('blocks paging and dims the rows while a page is in flight', async () => {
-      host.loading.set(true);
-      await fixture.whenStable();
+      await set({ loading: true });
 
       expect(buttonFor('Next page').disabled).toBe(true);
       expect(el.querySelector('ul.list')?.className).toContain('opacity-60');
