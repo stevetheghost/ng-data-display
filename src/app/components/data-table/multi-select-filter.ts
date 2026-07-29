@@ -33,8 +33,9 @@ import {
         <span class="text-base-content/50" aria-hidden="true">▾</span>
       </summary>
 
+      <!-- The list clears CDK's sticky table cells, which sit at z-index 100. -->
       <div
-        class="dropdown-content z-10 mt-1 max-h-64 w-56 overflow-y-auto rounded-box border border-base-300 bg-base-100 p-2 shadow-lg"
+        class="dropdown-content z-[200] mt-1 max-h-64 w-56 overflow-y-auto rounded-box border border-base-300 bg-base-100 p-2 shadow-lg"
       >
         <fieldset>
           <legend class="sr-only">{{ label() }}</legend>

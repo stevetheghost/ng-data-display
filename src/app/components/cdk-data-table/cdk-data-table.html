@@ -1,0 +1,166 @@
+<div
+  class="rounded-box border border-base-300 bg-base-100"
+  [attr.aria-busy]="loading() ? 'true' : null"
+>
+  @if (searchable()) {
+    <div class="flex flex-wrap items-center gap-3 border-b border-base-300 px-4 py-3">
+      <label [attr.for]="searchId" class="text-sm font-medium">{{ searchLabel() }}</label>
+      <input
+        [attr.id]="searchId"
+        type="search"
+        class="input input-sm w-64"
+        [value]="query().search"
+        [placeholder]="searchPlaceholder()"
+        (input)="onSearch($event)"
+      />
+
+      @if (loading()) {
+        <span class="loading loading-spinner loading-sm" aria-hidden="true"></span>
+        <span class="text-sm text-base-content/60">Loading…</span>
+      }
+    </div>
+  }
+
+  <div class="overflow-auto" [style.max-height]="maxHeight() || null">
+    <table
+      cdk-table
+      [dataSource]="visibleRows()"
+      [trackBy]="trackById"
+      class="table table-zebra"
+      [class]="loading() ? 'opacity-60' : ''"
+    >
+      <caption class="sr-only">{{ caption() }}</caption>
+
+      @for (column of columns(); track column.key) {
+        <!-- Header, body and footer cells for one column, in one definition. -->
+        <ng-container [cdkColumnDef]="column.key">
+          <th
+            cdk-header-cell
+            *cdkHeaderCellDef
+            scope="col"
+            class="bg-base-100 p-0"
+            [class]="column.align === 'end' ? 'text-right' : 'text-left'"
+            [attr.aria-sort]="isSortable(column) ? ariaSort(column) : null"
+          >
+            @if (isSortable(column)) {
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm w-full gap-1.5 rounded-none text-xs font-semibold tracking-wider uppercase"
+                [class]="column.align === 'end' ? 'justify-end' : 'justify-start'"
+                (click)="toggleSort(column)"
+              >
+                {{ column.header }}
+                <span class="text-base-content/50" aria-hidden="true">
+                  {{ sortIndicator(column) }}
+                </span>
+              </button>
+            } @else {
+              <span class="block px-4 py-3">{{ column.header }}</span>
+            }
+          </th>
+
+          <td
+            cdk-cell
+            *cdkCellDef="let row"
+            [class]="column.align === 'end' ? 'text-right tabular-nums' : 'text-left'"
+          >
+            <ng-container
+              [ngTemplateOutlet]="templateFor(column) ?? defaultCell"
+              [ngTemplateOutletContext]="{ $implicit: row, column: column }"
+            />
+          </td>
+
+          <td
+            cdk-footer-cell
+            *cdkFooterCellDef
+            class="bg-base-200 font-medium"
+            [class]="column.align === 'end' ? 'text-right tabular-nums' : 'text-left'"
+          >
+            {{ footerText(column) }}
+          </td>
+        </ng-container>
+
+        <!-- Filters sit in a header row of their own, so they need their own columns. -->
+        <ng-container [cdkColumnDef]="filterKey(column)">
+          <th cdk-header-cell *cdkHeaderCellDef class="bg-base-100 px-4 pt-2 pb-3 font-normal">
+            @switch (column.filter) {
+              @case ('multiselect') {
+                <app-multi-select-filter
+                  [label]="column.header"
+                  [options]="optionsFor(column)"
+                  [selected]="filterValues(column)"
+                  (selectedChange)="setColumnFilter(column, $event)"
+                />
+              }
+              @case ('select') {
+                <select
+                  class="select select-sm w-full font-normal normal-case"
+                  [attr.aria-label]="filterLabel(column)"
+                  [value]="filterValue(column)"
+                  (change)="onColumnFilter(column, $event)"
+                >
+                  <option value="">All</option>
+                  @for (option of optionsFor(column); track option) {
+                    <option [value]="option">{{ option }}</option>
+                  }
+                </select>
+              }
+              @case ('text') {
+                <input
+                  type="search"
+                  class="input input-sm w-full font-normal normal-case"
+                  [attr.aria-label]="filterLabel(column)"
+                  [value]="filterValue(column)"
+                  (input)="onColumnFilter(column, $event)"
+                />
+              }
+            }
+          </th>
+        </ng-container>
+      }
+
+      <!--
+        CDK reads its row and cell definitions once, when the table's content is
+        first checked — a definition that appears later never gets rendered. So
+        the filter and footer rows are always defined, and hidden until a column
+        asks for one; columns can then come and go without losing either row.
+      -->
+      <tr cdk-header-row *cdkHeaderRowDef="columnKeys(); sticky: stickyHeader()"></tr>
+
+      <tr
+        cdk-header-row
+        *cdkHeaderRowDef="filterColumnKeys(); sticky: stickyHeader()"
+        [class.hidden]="!hasColumnFilters()"
+      ></tr>
+
+      <tr cdk-row *cdkRowDef="let row; columns: columnKeys()" class="hover:bg-base-200"></tr>
+
+      <tr
+        cdk-footer-row
+        *cdkFooterRowDef="columnKeys(); sticky: stickyFooter()"
+        [class.hidden]="!hasFooter()"
+      ></tr>
+
+      <!-- CDK swaps this in for the body whenever the data source is empty. -->
+      <tr *cdkNoDataRow>
+        <td [attr.colspan]="columns().length" class="py-10 text-center text-base-content/60">
+          {{ loading() ? 'Loading…' : emptyMessage() }}
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  @if (paged()) {
+    <app-paginator
+      [pageIndex]="pageIndex()"
+      [pageSize]="query().pageSize"
+      [total]="totalRows()"
+      [pageSizeOptions]="pageSizeOptions()"
+      [disabled]="loading()"
+      (pageIndexChange)="setPageIndex($event)"
+      (pageSizeChange)="setPageSize($event)"
+    />
+  }
+</div>
+
+<ng-template #defaultCell let-row let-column="column">{{ cell(row, column) }}</ng-template>

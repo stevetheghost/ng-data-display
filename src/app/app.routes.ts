@@ -13,6 +13,11 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/table-demo/table-demo').then((m) => m.TableDemo),
   },
   {
+    path: 'cdk-data-table',
+    title: 'CDK data table · ng-data-display',
+    loadComponent: () => import('./pages/cdk-table-demo/cdk-table-demo').then((m) => m.CdkTableDemo),
+  },
+  {
     path: 'data-list',
     title: 'Data list · ng-data-display',
     loadComponent: () => import('./pages/list-demo/list-demo').then((m) => m.ListDemo),
