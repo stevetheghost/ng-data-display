@@ -2,7 +2,8 @@ import { Component, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { CellTemplate } from './cell-template';
-import { Column, DataTable, TableMode, TableQuery, emptyQuery } from './data-table';
+import { DataTable } from './data-table';
+import { Column, TableMode, TableQuery, emptyQuery } from './table-query';
 
 interface Row {
   id: string;

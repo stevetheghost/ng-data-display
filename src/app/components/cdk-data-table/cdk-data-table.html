@@ -27,9 +27,13 @@
       [dataSource]="visibleRows()"
       [trackBy]="trackById"
       class="table table-zebra"
-      [class]="loading() ? 'opacity-60' : ''"
+      [class.opacity-60]="loading()"
     >
-      <caption class="sr-only">{{ caption() }}</caption>
+      <caption class="sr-only">
+        {{
+          caption()
+        }}
+      </caption>
 
       @for (column of columns(); track column.key) {
         <!-- Header, body and footer cells for one column, in one definition. -->
@@ -39,14 +43,16 @@
             *cdkHeaderCellDef
             scope="col"
             class="bg-base-100 p-0"
-            [class]="column.align === 'end' ? 'text-right' : 'text-left'"
+            [class.text-right]="column.align === 'end'"
+            [class.text-left]="column.align !== 'end'"
             [attr.aria-sort]="isSortable(column) ? ariaSort(column) : null"
           >
             @if (isSortable(column)) {
               <button
                 type="button"
                 class="btn btn-ghost btn-sm w-full gap-1.5 rounded-none text-xs font-semibold tracking-wider uppercase"
-                [class]="column.align === 'end' ? 'justify-end' : 'justify-start'"
+                [class.justify-end]="column.align === 'end'"
+                [class.justify-start]="column.align !== 'end'"
                 (click)="toggleSort(column)"
               >
                 {{ column.header }}
@@ -62,7 +68,9 @@
           <td
             cdk-cell
             *cdkCellDef="let row"
-            [class]="column.align === 'end' ? 'text-right tabular-nums' : 'text-left'"
+            [class.text-right]="column.align === 'end'"
+            [class.tabular-nums]="column.align === 'end'"
+            [class.text-left]="column.align !== 'end'"
           >
             <ng-container
               [ngTemplateOutlet]="templateFor(column) ?? defaultCell"
@@ -74,7 +82,9 @@
             cdk-footer-cell
             *cdkFooterCellDef
             class="bg-base-200 font-medium"
-            [class]="column.align === 'end' ? 'text-right tabular-nums' : 'text-left'"
+            [class.text-right]="column.align === 'end'"
+            [class.tabular-nums]="column.align === 'end'"
+            [class.text-left]="column.align !== 'end'"
           >
             {{ footerText(column) }}
           </td>
@@ -120,10 +130,11 @@
       }
 
       <!--
-        CDK reads its row and cell definitions once, when the table's content is
-        first checked — a definition that appears later never gets rendered. So
-        the filter and footer rows are always defined, and hidden until a column
-        asks for one; columns can then come and go without losing either row.
+        CDK only notices a header or footer row def going away through its
+        imperative add/remove API — a def that disappears from the content query
+        leaves its rendered row behind in the outlet. So the filter and footer
+        rows stay defined and are hidden until a column asks for one; columns can
+        then come and go without stranding either row.
       -->
       <tr cdk-header-row *cdkHeaderRowDef="columnKeys(); sticky: stickyHeader()"></tr>
 

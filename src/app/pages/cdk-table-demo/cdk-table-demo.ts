@@ -1,11 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import {
-  CdkColumn,
-  CdkDataTable,
-  TableQuery,
-  emptyQuery,
-} from '../../components/cdk-data-table/cdk-data-table';
+import { CdkDataTable } from '../../components/cdk-data-table/cdk-data-table';
 import { CellTemplate } from '../../components/data-table/cell-template';
+import { Column, TableQuery, emptyQuery } from '../../components/data-table/table-query';
 import { StatusBadge } from '../../components/status-badge/status-badge';
 import { Fleet } from '../../data/fleet';
 import { ServiceMetric } from '../../models/service-metric.model';
@@ -23,7 +19,7 @@ export class CdkTableDemo {
   protected readonly query = signal<TableQuery>(emptyQuery(25));
 
   /** Page-scoped footers: the table hands each one the rows it is rendering. */
-  protected readonly columns = computed<readonly CdkColumn<ServiceMetric>[]>(() => [
+  protected readonly columns = computed<readonly Column<ServiceMetric>[]>(() => [
     {
       key: 'name',
       header: 'Service',

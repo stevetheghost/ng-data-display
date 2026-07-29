@@ -8,14 +8,13 @@ import {
   signal,
 } from '@angular/core';
 import { CellTemplate } from '../../components/data-table/cell-template';
+import { DataList, ListField } from '../../components/data-list/data-list';
 import {
-  DataList,
-  ListField,
   TableMode,
   TablePage,
   TableQuery,
   emptyQuery,
-} from '../../components/data-list/data-list';
+} from '../../components/data-table/table-query';
 import { StatusBadge } from '../../components/status-badge/status-badge';
 import { Fleet } from '../../data/fleet';
 import { FleetApi, toFleetRequest } from '../../data/fleet-api';

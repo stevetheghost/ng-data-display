@@ -1,8 +1,9 @@
-import { Component, signal } from '@angular/core';
+import { Component, WritableSignal, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { CellTemplate } from '../data-table/cell-template';
-import { CdkColumn, CdkDataTable, TableMode, TableQuery, emptyQuery } from './cdk-data-table';
+import { Column, TableMode, TableQuery, emptyQuery } from '../data-table/table-query';
+import { CdkDataTable } from './cdk-data-table';
 
 interface Row {
   id: string;
@@ -10,7 +11,7 @@ interface Row {
   score: number;
 }
 
-const COLUMNS: readonly CdkColumn<Row>[] = [
+const COLUMNS: readonly Column<Row>[] = [
   { key: 'name', header: 'Name', filter: 'text' },
   { key: 'score', header: 'Score', align: 'end', format: (row) => `${row.score} pts` },
 ];
@@ -47,12 +48,21 @@ const TWELVE: readonly Row[] = Array.from({ length: 12 }, (_, i) => ({
   `,
 })
 class Host {
-  readonly columns = signal<readonly CdkColumn<Row>[]>(COLUMNS);
+  readonly columns = signal<readonly Column<Row>[]>(COLUMNS);
   readonly rows = signal<readonly Row[]>(THREE);
   readonly mode = signal<TableMode>('client');
   readonly total = signal<number | null>(null);
   readonly loading = signal(false);
   readonly query = signal<TableQuery>(emptyQuery());
+}
+
+interface HostInputs {
+  columns: readonly Column<Row>[];
+  rows: readonly Row[];
+  mode: TableMode;
+  total: number | null;
+  loading: boolean;
+  query: TableQuery;
 }
 
 describe('CdkDataTable', () => {
@@ -96,6 +106,14 @@ describe('CdkDataTable', () => {
     await fixture.whenStable();
   }
 
+  /** Drives the host's inputs the way a parent template would, then settles. */
+  async function set(inputs: Partial<HostInputs>): Promise<void> {
+    for (const [key, value] of Object.entries(inputs)) {
+      (host[key as keyof HostInputs] as WritableSignal<unknown>).set(value);
+    }
+    await fixture.whenStable();
+  }
+
   beforeEach(async () => {
     await TestBed.configureTestingModule({ imports: [Host] }).compileComponents();
     fixture = TestBed.createComponent(Host);
@@ -126,8 +144,7 @@ describe('CdkDataTable', () => {
     });
 
     it('shows the CDK no-data row when there are no rows', async () => {
-      host.rows.set([]);
-      await fixture.whenStable();
+      await set({ rows: [] });
 
       expect(el.textContent).toContain('No rows match the current filters.');
       expect(el.querySelector('tbody td')?.getAttribute('colspan')).toBe('2');
@@ -157,15 +174,16 @@ describe('CdkDataTable', () => {
 
   describe('footer row', () => {
     beforeEach(async () => {
-      host.columns.set([
-        { key: 'name', header: 'Name', footer: (rows) => `${rows.length} shown` },
-        {
-          key: 'score',
-          header: 'Score',
-          footer: (rows) => `${rows.reduce((total, row) => total + row.score, 0)}`,
-        },
-      ]);
-      await fixture.whenStable();
+      await set({
+        columns: [
+          { key: 'name', header: 'Name', footer: (rows) => `${rows.length} shown` },
+          {
+            key: 'score',
+            header: 'Score',
+            footer: (rows) => `${rows.reduce((total, row) => total + row.score, 0)}`,
+          },
+        ],
+      });
     });
 
     it('summarises the rendered rows', () => {
@@ -179,19 +197,18 @@ describe('CdkDataTable', () => {
     });
 
     it('is hidden once no column defines one', async () => {
-      host.columns.set(COLUMNS);
-      await fixture.whenStable();
+      await set({ columns: COLUMNS });
 
       expect(el.querySelector('tfoot tr')?.classList.contains('hidden')).toBe(true);
       expect(footerValues()).toEqual(['', '']);
     });
 
     it('appears when a footer is added to a column set that had none', async () => {
-      host.columns.set(COLUMNS);
-      await fixture.whenStable();
+      await set({ columns: COLUMNS });
 
-      host.columns.set([{ ...COLUMNS[0], footer: (rows) => `${rows.length} shown` }, COLUMNS[1]]);
-      await fixture.whenStable();
+      await set({
+        columns: [{ ...COLUMNS[0], footer: (rows) => `${rows.length} shown` }, COLUMNS[1]],
+      });
 
       expect(el.querySelector('tfoot tr')?.classList.contains('hidden')).toBe(false);
       expect(footerValues()).toEqual(['3 shown', '']);
@@ -250,11 +267,12 @@ describe('CdkDataTable', () => {
     });
 
     it('renders a select filter with derived options', async () => {
-      host.columns.set([
-        { key: 'name', header: 'Name', filter: 'select' },
-        { key: 'score', header: 'Score' },
-      ]);
-      await fixture.whenStable();
+      await set({
+        columns: [
+          { key: 'name', header: 'Name', filter: 'select' },
+          { key: 'score', header: 'Score' },
+        ],
+      });
 
       const options = [...el.querySelectorAll<HTMLOptionElement>('select[aria-label] option')].map(
         (o) => o.value,
@@ -266,11 +284,12 @@ describe('CdkDataTable', () => {
     });
 
     it('keeps rows matching any ticked value of a multi-select', async () => {
-      host.columns.set([
-        { key: 'name', header: 'Name', filter: 'multiselect' },
-        { key: 'score', header: 'Score' },
-      ]);
-      await fixture.whenStable();
+      await set({
+        columns: [
+          { key: 'name', header: 'Name', filter: 'multiselect' },
+          { key: 'score', header: 'Score' },
+        ],
+      });
 
       const check = async (option: string) => {
         [...el.querySelectorAll<HTMLInputElement>('.dropdown input[type="checkbox"]')]
@@ -286,8 +305,7 @@ describe('CdkDataTable', () => {
     });
 
     it('hides the filter header row when no column asks for one', async () => {
-      host.columns.set([{ key: 'name', header: 'Name' }]);
-      await fixture.whenStable();
+      await set({ columns: [{ key: 'name', header: 'Name' }] });
 
       const rows = el.querySelectorAll('thead tr');
       expect(rows).toHaveLength(2);
@@ -296,11 +314,9 @@ describe('CdkDataTable', () => {
     });
 
     it('brings the filter row back when a column asks for one again', async () => {
-      host.columns.set([{ key: 'name', header: 'Name' }]);
-      await fixture.whenStable();
+      await set({ columns: [{ key: 'name', header: 'Name' }] });
 
-      host.columns.set([{ key: 'name', header: 'Name', filter: 'text' }]);
-      await fixture.whenStable();
+      await set({ columns: [{ key: 'name', header: 'Name', filter: 'text' }] });
 
       expect(el.querySelectorAll('thead tr')[1].classList.contains('hidden')).toBe(false);
 
@@ -309,8 +325,7 @@ describe('CdkDataTable', () => {
     });
 
     it('returns to the first page when a filter changes', async () => {
-      host.rows.set(TWELVE);
-      await fixture.whenStable();
+      await set({ rows: TWELVE });
 
       await click('Next page');
       expect(host.query().pageIndex).toBe(1);
@@ -322,8 +337,7 @@ describe('CdkDataTable', () => {
 
   describe('client-side paging', () => {
     beforeEach(async () => {
-      host.rows.set(TWELVE);
-      await fixture.whenStable();
+      await set({ rows: TWELVE });
     });
 
     it('shows only the first page by default', () => {
@@ -348,10 +362,7 @@ describe('CdkDataTable', () => {
 
   describe('server mode', () => {
     beforeEach(async () => {
-      host.mode.set('server');
-      host.rows.set(TWELVE.slice(0, 10));
-      host.total.set(57);
-      await fixture.whenStable();
+      await set({ mode: 'server', rows: TWELVE.slice(0, 10), total: 57 });
     });
 
     it('renders the given page verbatim without filtering it', async () => {
@@ -374,8 +385,7 @@ describe('CdkDataTable', () => {
     });
 
     it('marks the table busy and blocks paging while loading', async () => {
-      host.loading.set(true);
-      await fixture.whenStable();
+      await set({ loading: true });
 
       expect(el.querySelector('[aria-busy="true"]')).toBeTruthy();
       expect(buttonFor('Next page').disabled).toBe(true);
